@@ -68,6 +68,15 @@ Cleanup for packaging:
 
 ---
 
+## Install firmware (no build)
+
+Prebuilt binary for M5Cardputer (One Pork **v0.1.8c (1.3)**):
+
+- `releases/OnePork_v0.1.8c-1.3_m5cardputer_firmware.bin`
+
+Flash with M5 Launcher / M5Burner / `esptool` / PlatformIO upload of that file.
+XP is kept if you update via M5 Launcher (do not wipe NVS).
+
 ## Build (fan)
 
 ```text

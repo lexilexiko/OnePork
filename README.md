@@ -1328,7 +1328,12 @@
 
 ----[ 10.2 - FROM RELEASE (recommended)
 
-    github.com/0ct0sec/M5PORKCHOP/releases
+    upstream official:
+        github.com/0ct0sec/M5PORKCHOP/releases
+
+    One Pork fan binary (this tree, v0.1.8c (1.3)):
+        releases/OnePork_v0.1.8c-1.3_m5cardputer_firmware.bin
+        (on GitHub: repo → releases/ folder or Releases page if published)
 
     1. download firmware.bin
     2. SD card -> M5 Launcher -> install

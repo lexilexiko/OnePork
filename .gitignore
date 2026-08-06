@@ -15,12 +15,15 @@ compile_commands.json
 *.ski*
 external/
 
-# Generated / large binaries
+# Generated / large binaries (build tree)
 *.bin
 *.elf
 *.map
 *.o
 *.a
+# Published install binaries for users (GitHub download)
+!releases/
+!releases/*.bin
 
 # Captures / dumps / wordlists (never ship secrets or loot)
 Passworld/
