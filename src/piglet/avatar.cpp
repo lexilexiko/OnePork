@@ -747,93 +747,60 @@ static void drawPixelPigDetailed(M5Canvas& canvas, int16_t ox, int16_t oy,
     if (!earPerk && !wet) { P(1, ey - 1, O); P(6, ey - 1, O); }
     else if (earPerk && !wet) { P(1, ey - 1, A); P(6, ey - 1, A); }
 
-    // ========== EYES ONLY (body silhouette unchanged) ==========
-    // Each mood = unique silhouette so they never read the same.
-    // Priority: blink > happy > sniff > sleepy > sad > angry > hunt > excited > neutral
+    // ========== EYES — soft round chibi (not angular cone/drop) ==========
+    // Priority: blink > happy-squint > sniff focus > sleepy > sad > angry > hunt > excited > neutral
     if (blink) {
-        // BLINK — flat closed line (not a smile)
-        //   ----
-        P(2, -13, O); P(3, -13, O); P(4, -13, O); P(5, -13, O);
-        P(3, -14, B); P(4, -14, B);  // soft lid shadow above
+        // Soft closed curve (cute blink, not a hard slash)
+        P(2, -13, O); P(3, -14, O); P(4, -14, O); P(5, -13, O);
+        P(3, -13, B); P(4, -13, B);
     } else if (happySquint) {
-        // HAPPY — ^_^ upward crescents (clearly different from blink)
-        //  /\/\
-        P(2, -13, O); P(5, -13, O);
-        P(3, -14, O); P(4, -14, O);
-        P(3, -13, EG); P(4, -13, EG);  // bright arc glint
-        P(2, -14, B); P(5, -14, B);
+        // ^_^ squint smile eyes — clearly "happy", not open scary whites
+        P(2, -13, O); P(3, -14, O); P(4, -14, O); P(5, -13, O);
+        P(3, -13, B); P(4, -13, B);
+        // tiny glint on the arc
+        P(3, -14, EG);
     } else if (sniff) {
-        // SNIFF — horizontal oval, pupil shoved toward snout (looks right on face)
-        //  .--.
-        //  | o>|
-        //  '--'
-        P(2, -14, O); P(3, -15, O); P(4, -15, O); P(5, -14, O);
-        P(2, -13, O); P(3, -13, EW); P(4, -13, EP); P(5, -13, EP);  // pupil forward
-        P(2, -12, O); P(3, -12, O); P(4, -12, O); P(5, -12, O);
-        P(3, -14, EW); P(4, -14, EI);
-        // curious raised outer brow
-        P(5, -16, S);
+        // Soft half-open, pupil shifted toward snout (curious sniff)
+        P(2, -14, O); P(3, -14, O); P(4, -14, O); P(5, -14, O);
+        P(2, -13, O); P(3, -13, EW); P(4, -13, EP); P(5, -13, O);
+        P(3, -12, O); P(4, -12, O);
+        // content brow
+        P(2, -15, S); P(5, -15, S);
     } else if (isSleepy) {
-        // SLEEPY — heavy upper lid, thin crescent open at bottom (zzz)
-        //  ====
-        //  .--.
-        P(2, -14, O); P(3, -14, O); P(4, -14, O); P(5, -14, O);  // thick closed top
-        P(2, -13, O); P(3, -13, EW); P(4, -13, EP); P(5, -13, O); // thin gap
+        // Heavy lids, soft half-moon eye
+        P(2, -14, O); P(3, -14, O); P(4, -14, O); P(5, -14, O);
+        P(2, -13, O); P(3, -13, EW); P(4, -13, EP); P(5, -13, O);
         P(3, -12, O); P(4, -12, O);
-        // droopy outer corner
-        P(5, -13, O); P(5, -12, S);
     } else if (isSad) {
-        // SAD — small diamond / teardrop eye + down brow + tear
-        //   \
-        //  .o.
-        //   v  + tear
-        P(3, -15, O); P(4, -15, S);                 // inner brow down
-        P(2, -14, O); P(5, -14, O);
-        P(3, -14, EW); P(4, -14, EW);
-        P(3, -13, EI); P(4, -13, EP);
+        // Small watery eyes + downturned brows
+        P(2, -15, O); P(3, -15, S);                 // brow down-in
+        P(2, -14, O); P(3, -14, EW); P(4, -14, EW); P(5, -14, O);
+        P(2, -13, O); P(3, -13, EI); P(4, -13, EP); P(5, -13, O);
         P(3, -12, O); P(4, -12, O);
-        // single tear drop under outer corner
+        // tear sparkle
         P(5, -12, zombie ? EG : EW);
-        P(5, -11, zombie ? EG : EW);
     } else if (isAngry) {
-        // ANGRY — sharp \ brow + thin angry slit (horizontal glare)
-        //   \___
-        //   =o=
-        P(2, -16, O); P(3, -15, O); P(4, -15, O); P(5, -14, O);  // hard \ brow
-        P(2, -14, O); P(5, -14, O);
-        P(3, -14, EW); P(4, -14, EP);               // narrow bright slit + dark pupil
-        P(3, -13, O); P(4, -13, O);                 // lower lid up (squint)
-        P(2, -13, O); P(5, -13, O);
+        // Soft slant brows (cute mad, not demon cones) + focused round eye
+        P(2, -15, O); P(3, -15, O); P(4, -16, O);   // / brow
+        P(2, -14, O); P(3, -14, EW); P(4, -14, EI); P(5, -14, O);
+        P(2, -13, O); P(3, -13, EI); P(4, -13, EP); P(5, -13, O);
+        P(3, -12, O); P(4, -12, O);
     } else if (isHunt) {
-        // HUNTING — cat-like vertical slit pupil (predator focus)
-        //  .--.
-        //  ||| |
-        //  '--'
-        P(2, -15, O); P(3, -15, EW); P(4, -15, EW); P(5, -15, O);
-        P(2, -14, O); P(3, -14, EI); P(4, -14, EP); P(5, -14, O);
-        P(2, -13, O); P(3, -13, EI); P(4, -13, EP); P(5, -13, O);  // tall pupil column
+        // Determined narrowed eye + slight brow
+        P(2, -15, S); P(3, -15, S);
+        P(2, -14, O); P(3, -14, O); P(4, -14, O); P(5, -14, O);
+        P(2, -13, O); P(3, -13, EI); P(4, -13, EP); P(5, -13, O);
         P(3, -12, O); P(4, -12, O);
-        // flat determination brow
-        P(2, -16, S); P(3, -16, S); P(4, -16, S);
     } else if (isExcited) {
-        // EXCITED — big round stars (taller + glints)
-        //  .***.
-        //  *o*o*
-        //  '***'
-        P(2, -16, O); P(5, -16, O);
-        P(3, -16, EW); P(4, -16, EW);
-        P(2, -15, O); P(3, -15, EG); P(4, -15, EI); P(5, -15, O);
-        P(2, -14, O); P(3, -14, EI); P(4, -14, EP); P(5, -14, O);
-        P(2, -13, O); P(3, -13, EI); P(4, -13, EI); P(5, -13, O);
+        // Big sparkly round eyes (jump / excited)
+        P(2, -15, O); P(3, -15, EW); P(4, -15, EW); P(5, -15, O);
+        P(2, -14, O); P(3, -14, EG); P(4, -14, EI); P(5, -14, O);
+        P(2, -13, O); P(3, -13, EI); P(4, -13, EP); P(5, -13, O);
         P(3, -12, O); P(4, -12, O);
-        // star sparkles around eye
-        P(1, -15, EG); P(6, -14, EG);
-        P(3, -16, EG);
+        // extra star glint
+        P(3, -15, EG);
     } else {
-        // NEUTRAL — classic soft circle (default calm look)
-        //  .--.
-        //  |o.|
-        //  '--'
+        // NEUTRAL — soft round eye: outline circle, sclera, iris, pupil, glint
         P(2, -15, O); P(5, -15, O);
         P(3, -15, EW); P(4, -15, EW);
         P(2, -14, O); P(3, -14, EG); P(4, -14, EI); P(5, -14, O);

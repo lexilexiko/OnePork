@@ -34,6 +34,7 @@
     12. TROUBLESHOOTING (the confessional)
     13. GREETZ
     14. RECENT PORK (v0.1.8c community pass + thank you)
+    15. ONE PORK (fan packaging — donate the original)
 
     (pro tip: CTRL+F "horse" for enlightenment.
      we counted them. the horse counted more.
@@ -1317,14 +1318,11 @@
     debug build (SD logging, verbose output):
     $ pio run -e m5cardputer-debug
 
-    run unit tests (native platform, no hardware):
-    $ pio test -e native
-
-    tests with coverage:
-    $ pio test -e native_coverage
-
     create release binaries:
     $ python scripts/build_release.py
+
+    (host unit-test envs were dropped in the One Pork fan packaging —
+     they never ran on the Cardputer. see FAN.md)
 
 
 ----[ 10.2 - FROM RELEASE (recommended)
@@ -1655,5 +1653,45 @@
     the pig would not exist without you.
     the horse confirms the structure is load-bearing.
     oink forever.
+
+
+------------------------------------------------------------------------
+
+--[ 15 - ONE PORK (FAN PACKAGING)
+
+    this folder may be published as **One Pork** — a fan / community
+    packaging of M5PORKCHOP. it is NOT a rewrite of authorship.
+
+----[ 15.1 - DONATE THE CREATOR. FAN ONLY FOR THE REST.
+
+    **ORIGINAL AUTHOR:** 0ct0
+    **DONATE HERE (official):** https://buymeacoffee.com/0ct0
+    also listed in .github/FUNDING.yml → buy_me_a_coffee: 0ct0
+
+    **Fan packaging contact (NOT the author):** lexilexiko
+        only a fan who wired extra straw on the barn.
+        do not send creator donations to the fan.
+        star / fork / thank 0ct0 first.
+
+    full fan changelog + tree map: **FAN.md**
+
+
+----[ 15.2 - WHAT THIS FAN PASS ADDED (SHORT)
+
+    - trees + falling produce module (seasonal fruit, world scroll, FG drops)
+    - wolf visitor (bite → play-dead 10s; sit → pass by; attack scares wolf)
+    - IDLE free-roam polish; scene suspend on heavy ops (PigPass / TLS / …)
+    - Hashes/Tracks scan deferred fix (soft heap gate)
+    - packaging cleanup (no host unit-test tree on device builds)
+
+    everything RF/core that already oinked: still 0ct0's foundation.
+
+
+----[ 15.3 - UPSTREAM
+
+    https://github.com/0ct0sec/M5PORKCHOP
+    https://buymeacoffee.com/0ct0
+
+    praise the sun. oink forever. the horse is still the barn.
 
 ==[EOF]==
