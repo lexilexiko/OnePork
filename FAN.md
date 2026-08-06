@@ -1,5 +1,9 @@
 # One Pork — fan build notes
 
+**Version: v0.1.8c (1.3)**  
+- `0.1.8c` — last known upstream M5PORKCHOP base  
+- `(1.3)` — One Pork fan package revision (next changes → **1.4**, then **1.5**…)
+
 This tree is a **fan / community packaging** of **M5PORKCHOP**.
 
 ## Credits & donations (read this first)

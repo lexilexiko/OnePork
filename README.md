@@ -2,7 +2,8 @@
                     Volume Zero, Issue 3, Phile 1 of 1
 
                           M5PORKCHOP README
-                          v0.1.8-Mode-Fun
+                          v0.1.8c (1.3)
+                   (upstream 0.1.8c · One Pork fan package 1.3)
 
                             ^__^
                             (oo)\_______
@@ -34,7 +35,7 @@
     12. TROUBLESHOOTING (the confessional)
     13. GREETZ
     14. RECENT PORK (v0.1.8c community pass + thank you)
-    15. ONE PORK (fan packaging — donate the original)
+    15. ONE PORK v0.1.8c (1.3) — fan packaging; donate the original
 
     (pro tip: CTRL+F "horse" for enlightenment.
      we counted them. the horse counted more.
@@ -1657,7 +1658,11 @@
 
 ------------------------------------------------------------------------
 
---[ 15 - ONE PORK (FAN PACKAGING)
+--[ 15 - ONE PORK v0.1.8c (1.3) (FAN PACKAGING)
+
+    VERSION: **v0.1.8c (1.3)**
+        - 0.1.8c  = last known upstream M5PORKCHOP line this tree is based on
+        - (1.3)   = One Pork fan package revision (next fan drop = 1.4, then 1.5…)
 
     this folder may be published as **One Pork** — a fan / community
     packaging of M5PORKCHOP. it is NOT a rewrite of authorship.
