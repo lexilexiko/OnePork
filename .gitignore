@@ -1,0 +1,47 @@
+# Build / IDE
+.pio/
+.vscode/
+.cache/
+.clangd/
+compile_commands.json
+**/build_info.h
+*_builds/
+
+# Local / machine stuff
+.z*
+.con*/
+.cu*
+.cl*
+*.ski*
+external/
+
+# Generated / large binaries
+*.bin
+*.elf
+*.map
+*.o
+*.a
+
+# Captures / dumps / wordlists (never ship secrets or loot)
+Passworld/
+*.pcap
+*.cap
+*.22000
+*.csv
+
+# Local config that may hold WiFi/API keys
+data/config.json
+**/wpasec_key.txt
+**/wpa-sec/
+**/*secret*
+**/*password*
+.env
+.env.*
+
+# Docs noise (keep main README)
+docs/
+scripts/heap_analyzer.py
+
+# But always ship the project readme + license
+!README.md
+!LICENSE
