@@ -13,6 +13,7 @@ enum class Produce : uint8_t {
     BERRY = 0,
     RED_APPLE,
     YELLOW_APPLE,
+    GREEN_APPLE,   // autumn bush — summer-shaped apple, green
     BIRCH_CATKIN,
     ACORN,
     CONE

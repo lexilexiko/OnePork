@@ -38,15 +38,22 @@ static constexpr uint16_t C_APPLE_YEL3   = 0xC540;
 static constexpr uint16_t C_APPLE_YEL_H  = 0xFFFB;
 static constexpr uint16_t C_STEM   = 0x5A20;  // brown stem
 static constexpr uint16_t C_LEAF   = 0x2C00;  // tiny leaf
-static constexpr uint16_t C_CONE   = 0x9A40;
-static constexpr uint16_t C_CONE2  = 0x7A00;
-static constexpr uint16_t C_CONE_H = 0xDE20;
-static constexpr uint16_t C_BIRCH_CAT  = 0xC840;
-static constexpr uint16_t C_BIRCH_CAT2 = 0x8C40;
-static constexpr uint16_t C_BIRCH_CAT_H= 0xE6A0;
+// Acorns — warmer gold/orange so they pop on autumn leaves (not mud-brown)
+static constexpr uint16_t C_CONE   = 0xFD20;  // bright amber nut
+static constexpr uint16_t C_CONE2  = 0xC300;  // deep orange cap
+static constexpr uint16_t C_CONE_H = 0xFFE0;  // yellow highlight
+// Birch catkins — warm cream/gold (readable on spring green)
+static constexpr uint16_t C_BIRCH_CAT  = 0xFEE0;  // bright yellow-cream
+static constexpr uint16_t C_BIRCH_CAT2 = 0xD580;  // gold shade
+static constexpr uint16_t C_BIRCH_CAT_H= 0xFFFF;  // white tip
+// Berries stay magenta-pink (already contrasty)
 static constexpr uint16_t C_BERRY  = 0xD81F;
 static constexpr uint16_t C_BERRY2 = 0xF81F;
 static constexpr uint16_t C_BERRY_H= 0xFCDF;
+// True fir cones stay brown (winter tree is dark green — brown is fine)
+static constexpr uint16_t C_FIR_CONE  = 0x9A40;
+static constexpr uint16_t C_FIR_CONE2 = 0x6200;
+static constexpr uint16_t C_FIR_CONE_H= 0xDE20;
 
 // Stamp one fat pixel cell at grid (lx, ly) relative to center gx,gy
 static void cell(M5Canvas& canvas, int16_t gx, int16_t gy, int lx, int ly, uint16_t col) {
@@ -137,12 +144,20 @@ static int produceSizeTier(int r) {
 }
 
 // Rounded apple — compact only (red was reading as watermelon).
-// Both tiers stay ~3 cells wide; plump adds stem leaf + one shade pixel.
-static void drawApple(M5Canvas& canvas, int16_t gx, int16_t gy, int tier, bool yellow) {
-    uint16_t body = fl(yellow ? C_APPLE_YEL  : C_APPLE_RED);
-    uint16_t mid  = fl(yellow ? C_APPLE_YEL2 : C_APPLE_RED2);
-    uint16_t deep = fl(yellow ? C_APPLE_YEL3 : C_APPLE_RED3);
-    uint16_t hi   = fl(yellow ? C_APPLE_YEL_H : C_APPLE_RED_H);
+// color: 0=red, 1=yellow, 2=green (autumn bush)
+static void drawApple(M5Canvas& canvas, int16_t gx, int16_t gy, int tier, int color) {
+    uint16_t body, mid, deep, hi;
+    if (color == 1) {
+        body = fl(C_APPLE_YEL); mid = fl(C_APPLE_YEL2); deep = fl(C_APPLE_YEL3); hi = fl(C_APPLE_YEL_H);
+    } else if (color == 2) {
+        // Soft green apple — muted, harmonizes with autumn canopy (not neon)
+        body = fl(0x8D40);   // soft olive-green body
+        mid  = fl(0x6400);   // deeper olive shade
+        deep = fl(0x4200);   // dark green
+        hi   = fl(0xC6E0);   // warm pale highlight (not toxic lime)
+    } else {
+        body = fl(C_APPLE_RED); mid = fl(C_APPLE_RED2); deep = fl(C_APPLE_RED3); hi = fl(C_APPLE_RED_H);
+    }
     uint16_t stem = fl(C_STEM);
     uint16_t leaf = fl(C_LEAF);
 
@@ -190,27 +205,30 @@ static void drawBerry(M5Canvas& canvas, int16_t gx, int16_t gy, int tier) {
 }
 
 static void drawAcorn(M5Canvas& canvas, int16_t gx, int16_t gy, int tier) {
+    // Bright amber acorn + dark outline so it reads on orange oak leaves
     uint16_t cap = fl(C_CONE2);
     uint16_t nut = fl(C_CONE);
     uint16_t hi  = fl(C_CONE_H);
-    // cap on top, round nut below (not a square)
-    cell(canvas, gx, gy, -1, -1, cap);
+    uint16_t out = fl(0x8000);  // dark red-brown rim
+    cell(canvas, gx, gy, -1, -1, out);
     cell(canvas, gx, gy,  0, -1, cap);
-    cell(canvas, gx, gy,  1, -1, cap);
+    cell(canvas, gx, gy,  1, -1, out);
     cell(canvas, gx, gy,  0, -2, hi);  // stem nub
-    cell(canvas, gx, gy,  0,  0, nut);
     cell(canvas, gx, gy, -1,  0, nut);
-    cell(canvas, gx, gy,  1,  0, fl(C_CONE2));
+    cell(canvas, gx, gy,  0,  0, hi);
+    cell(canvas, gx, gy,  1,  0, nut);
+    cell(canvas, gx, gy,  0,  1, nut);
     if (tier >= 1) {
-        cell(canvas, gx, gy,  0,  1, nut);
-        cell(canvas, gx, gy, -1,  1, fl(C_CONE2));
+        cell(canvas, gx, gy, -1,  1, cap);
+        cell(canvas, gx, gy,  1,  1, cap);
     }
 }
 
 static void drawCone(M5Canvas& canvas, int16_t gx, int16_t gy, int tier) {
-    uint16_t a = fl(C_CONE);
-    uint16_t b = fl(C_CONE2);
-    uint16_t h = fl(C_CONE_H);
+    // Winter fir cones — brown (tree is dark; snow helps silhouette)
+    uint16_t a = fl(C_FIR_CONE);
+    uint16_t b = fl(C_FIR_CONE2);
+    uint16_t h = fl(C_FIR_CONE_H);
     // tapered cone (point up)
     cell(canvas, gx, gy,  0, -2, h);
     cell(canvas, gx, gy, -1, -1, b);
@@ -227,18 +245,22 @@ static void drawCone(M5Canvas& canvas, int16_t gx, int16_t gy, int tier) {
 }
 
 static void drawCatkin(M5Canvas& canvas, int16_t gx, int16_t gy, int tier) {
+    // Bright cream/gold hanging catkin — pops on spring green (dark outline)
     uint16_t a = fl(C_BIRCH_CAT);
     uint16_t b = fl(C_BIRCH_CAT2);
     uint16_t h = fl(C_BIRCH_CAT_H);
+    uint16_t out = fl(0x6A00);  // brown rim
     // hanging oval droop
     cell(canvas, gx, gy,  0, -1, h);
+    cell(canvas, gx, gy, -1,  0, out);
     cell(canvas, gx, gy,  0,  0, a);
-    cell(canvas, gx, gy, -1,  0, b);
+    cell(canvas, gx, gy,  1,  0, out);
     cell(canvas, gx, gy,  0,  1, a);
+    cell(canvas, gx, gy, -1,  1, b);
     cell(canvas, gx, gy,  0,  2, b);
     if (tier >= 1) {
-        cell(canvas, gx, gy,  1,  0, a);
-        cell(canvas, gx, gy,  0,  3, b);
+        cell(canvas, gx, gy,  1,  1, a);
+        cell(canvas, gx, gy,  0,  3, out);
     }
 }
 
@@ -248,10 +270,13 @@ void drawProduce(M5Canvas& canvas, int16_t cx, int16_t cy, int r, Produce p) {
 
     switch (p) {
         case Produce::RED_APPLE:
-            drawApple(canvas, gx, gy, tier, false);
+            drawApple(canvas, gx, gy, tier, 0);
             break;
         case Produce::YELLOW_APPLE:
-            drawApple(canvas, gx, gy, tier, true);
+            drawApple(canvas, gx, gy, tier, 1);
+            break;
+        case Produce::GREEN_APPLE:
+            drawApple(canvas, gx, gy, tier, 2);
             break;
         case Produce::BERRY:
             drawBerry(canvas, gx, gy, tier);
@@ -337,9 +362,10 @@ void drawDropsForeground(M5Canvas& canvas) {
         uint16_t col = fl(C_APPLE_RED);
         switch (splashes[i].produce) {
             case Produce::YELLOW_APPLE: col = fl(C_APPLE_YEL); break;
+            case Produce::GREEN_APPLE:  col = fl(0x8D40); break;
             case Produce::BIRCH_CATKIN: col = fl(C_BIRCH_CAT); break;
-            case Produce::ACORN:
-            case Produce::CONE:         col = fl(C_CONE); break;
+            case Produce::ACORN:        col = fl(C_CONE); break;
+            case Produce::CONE:         col = fl(C_FIR_CONE); break;
             case Produce::BERRY:        col = fl(C_BERRY); break;
             default: break;
         }

@@ -18,12 +18,20 @@ void draw(M5Canvas& canvas);
 // (spring lightning bolts live here so they sit in the sky)
 void drawBackdrop(M5Canvas& canvas);
 
+// Scroll world-space FX with grass treadmill (snow banks, etc.)
+// Same sign as Trees::scroll: +1 / -1 per grass pixel step.
+void scroll(int dir);
+
+// Pig walks through snow banks → trample path (melt under feet)
+// pigFeetX = avatar feet X on screen
+void trampleSnow(int pigFeetX);
+
 // Optional: clear all FX (mode changes, tests)
 void reset();
 
-// Spring  — lightning bolts (backdrop), flower-heavy grass is in Avatar
-// Summer  — butterflies
-// Autumn  — leaves, tumbleweed
-// Winter  — snow banks
+// Spring  — lightning bolts (backdrop) + thunder storms
+// Summer  — butterflies + golden pollen motes (unique heat shimmer)
+// Autumn  — dense falling leaves + rolling tumbleweed
+// Winter  — tall snow banks; pig walk tramples a path through drifts
 
 }  // namespace SeasonalFx

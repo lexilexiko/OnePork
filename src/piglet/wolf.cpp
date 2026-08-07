@@ -110,7 +110,7 @@ void scareAway() {
         vx = LEAVE_SPEED * 1.35f;
     }
     howled = true;
-    SFX::play(SFX::WOLF);
+    SFX::play(SFX::WOLF_HIT);  // pig smacked it — yelp, not full howl
 }
 
 int16_t getY() { return (int16_t)y; }

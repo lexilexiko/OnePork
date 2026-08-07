@@ -79,8 +79,10 @@ enum Event {
     // === SCENE FX ===
     THUNDER,            // storm crack - low boom + sizzle
     WOLF,               // visitor growl / howl stub
+    WOLF_HIT,           // pig smacks wolf — short yelp
     JUMP,               // pig hop - short rising boing
-    ATTACK_HOP          // pounce / stomp attack
+    ATTACK_HOP,         // pounce / stomp attack
+    RAIN_TICK           // quiet ambient drip (rain) — keep very soft
 };
 
 // Initialize audio system (call once at startup)

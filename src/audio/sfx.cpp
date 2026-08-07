@@ -428,6 +428,22 @@ static const Note SND_ATTACK_HOP[] = {
     {0, 0, 0}
 };
 
+// WOLF_HIT: Pig lands a hit — short yelp + scamper (not full howl)
+static const Note SND_WOLF_HIT[] = {
+    {900, 18, 0},     // smack
+    {720, 22, 4},     // yelp
+    {1100, 20, 0},    // high flinch
+    {480, 28, 0},     // scamper off
+    {0, 0, 0}
+};
+
+// RAIN_TICK: very soft ambient drip — short, sparse, never spam-loud
+static const Note SND_RAIN_TICK[] = {
+    {1400, 12, 0},    // tiny drip
+    {1100, 10, 0},    // soft second drop
+    {0, 0, 0}
+};
+
 // ==[ MORSE REMOVED ]==
 // Morse GG was too long (600ms+), replaced with warm resolve in HANDSHAKE
 
@@ -438,6 +454,9 @@ static uint8_t currentVolumeScale = 100;  // 0-100%, set before each sound
 
 static uint8_t eventVolumeScale(Event e) {
     switch (e) {
+        // WHISPER (20%) — rain drip: quiet so it never tortures
+        case RAIN_TICK:
+            return 20;
         // AMBIENT (35%) — below conscious attention threshold
         case BIRD_HIT:
         case BIRD_IMPACT:
@@ -459,6 +478,8 @@ static uint8_t eventVolumeScale(Event e) {
         case THUNDER:
         case WOLF:
             return 70;
+        case WOLF_HIT:
+            return 65;
         // FULL (100%) — celebrations, captures, UI, pig voices
         default:
             return 100;
@@ -712,11 +733,17 @@ bool update() {
             case WOLF:
                 startSequence(SND_WOLF);
                 break;
+            case WOLF_HIT:
+                startSequence(SND_WOLF_HIT);
+                break;
             case JUMP:
                 startSequence(SND_JUMP);
                 break;
             case ATTACK_HOP:
                 startSequence(SND_ATTACK_HOP);
+                break;
+            case RAIN_TICK:
+                startSequence(SND_RAIN_TICK);
                 break;
             default:
                 break;

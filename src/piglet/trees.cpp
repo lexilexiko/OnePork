@@ -158,8 +158,10 @@ static bool globalStompArmed = true;
 
 // Season → falling / hanging produce
 static Produce produceForSlot(const Slot& t) {
+    // Bush always berries (all seasons)
     if (t.kind == Kind::BERRY) return Produce::BERRY;
-    if (t.style == SeasonTree::OAK) return Produce::ACORN;
+    // Autumn oak tree: soft green apples (harmonize with canopy, not neon)
+    if (t.style == SeasonTree::OAK) return Produce::GREEN_APPLE;
     if (t.style == SeasonTree::BIRCH) return Produce::BIRCH_CATKIN;
     if (t.style == SeasonTree::FIR) return Produce::CONE;
     return Produce::RED_APPLE;
@@ -196,8 +198,14 @@ static void genClassicTree(Slot& t, uint8_t fruitCount, uint8_t scalePct) {
     t.seed = esp_random();
     t.scroll = 0;
     uint32_t s = t.seed;
-    if (t.kind != Kind::BERRY) t.style = currentStyle();
-    else t.style = SeasonTree::APPLE;  // unused for bush
+    if (t.kind != Kind::BERRY) {
+        t.style = currentStyle();
+        // DECOR never becomes fir — classic tree with winter snow instead of 2nd fir
+        if (t.kind == Kind::DECOR && t.style == SeasonTree::FIR)
+            t.style = SeasonTree::APPLE;
+    } else {
+        t.style = SeasonTree::APPLE;  // bush shape; produce color from season
+    }
 
     // Position opposite the pig (berry mid-ground)
     if (t.kind == Kind::BERRY) {
@@ -376,10 +384,10 @@ static void genClassicTree(Slot& t, uint8_t fruitCount, uint8_t scalePct) {
     if (withProduce) {
         uint8_t want = fruitCount;
         if (t.kind == Kind::BERRY) {
-            want = 5 + (uint8_t)(lcg(s) % 4);
+            want = 5 + (uint8_t)(lcg(s) % 4);  // berries always
             if (want > MAX_FRUITS) want = MAX_FRUITS;
         } else if (t.style == SeasonTree::OAK) {
-            want = 3 + (uint8_t)(lcg(s) % 4);  // acorns
+            want = 4 + (uint8_t)(lcg(s) % 4);  // soft green apples
             if (want > MAX_FRUITS) want = MAX_FRUITS;
         } else if (t.style == SeasonTree::BIRCH) {
             // birch catkins: a few small clusters
@@ -394,7 +402,7 @@ static void genClassicTree(Slot& t, uint8_t fruitCount, uint8_t scalePct) {
         uint8_t rBase = 2, rJitter = 2;
         if (t.kind == Kind::BERRY) { rBase = 2; rJitter = 2; }
         else if (t.style == SeasonTree::FIR) { rBase = 2; rJitter = 2; }
-        else if (t.style == SeasonTree::OAK) { rBase = 2; rJitter = 2; }
+        else if (t.style == SeasonTree::OAK) { rBase = 2; rJitter = 2; }  // compact green apples
         else if (t.style == SeasonTree::BIRCH) { rBase = 2; rJitter = 3; }
         else if (t.style == SeasonTree::APPLE) { rBase = 2; rJitter = 2; } // 2..3 compact
         uint8_t endpointCount = t.branchCount > 0 ? t.branchCount : 1;
@@ -696,6 +704,15 @@ bool updateAmbient(int pigCenterX, int pigFeetY, int pigHintX_, bool pigOnRight)
         }
     }
 
+    // Ambient drops from berry bush (autumn: green apples; else berries)
+    static uint32_t nextBerryDropMs = 0;
+    if (nextBerryDropMs == 0) nextBerryDropMs = now + 3500;
+    Slot& berry = berrySlot();
+    if (berry.phase == Phase::ALIVE && berry.fruitCount > 0 && now >= nextBerryDropMs) {
+        dropOneFrom(berry);
+        nextBerryDropMs = now + 1600 + (esp_random() % 2400);
+    }
+
     // --- Auto-collect fallen fruit/berries near pig ---
     bool got = tryCollectNearbyFruit(pigCenterX, pigFeetY, 24);
     // Keep sucking nearby produce if several landed together
@@ -878,9 +895,24 @@ static void drawFir(M5Canvas& canvas, Slot& t, int16_t yOffset) {
             }
             // tip
             canvas.fillRect(bx - PX + sway, ty - PX, PX * 2, PX, fl(C_FIR2));
-            // snow cap on each tier
-            canvas.fillRect(bx - half / 2 + sway, ty - PX, half > PX ? half : PX * 2, PX, fl(0xFFFF));
+            // Snow on fir — cap + side patches + lower fluff (winter volume)
+            int16_t snowW = half > PX ? half : PX * 2;
+            canvas.fillRect(bx - half / 2 + sway, ty - PX, snowW, PX, fl(0xFFFF));
             canvas.fillRect(bx - half / 3 + sway, ty - 2 * PX, half / 2 + PX, PX, fl(0xDEFB));
+            // left/right snow clumps on needles
+            if (half > PX * 3) {
+                canvas.fillRect(bx - half + PX + sway, ty + PX, PX * 2, PX, fl(0xFFFF));
+                canvas.fillRect(bx + half - PX * 3 + sway, ty + PX, PX * 2, PX, fl(0xDEFB));
+            }
+            // mid-tier dusting (every other tier)
+            if ((i & 1) == 0 && half > PX * 2) {
+                canvas.fillRect(bx - PX + sway, ty + PX * 2, PX * 2, PX, fl(0xEF7D));
+            }
+        }
+        // Base snow pile at trunk foot
+        if (!collapsing && g > 0.5f) {
+            canvas.fillRect(bx - PX * 3 + sway, baseY - PX, PX * 6, PX, fl(0xFFFF));
+            canvas.fillRect(bx - PX * 2 + sway, baseY - 2 * PX, PX * 4, PX, fl(0xDEFB));
         }
     }
 
@@ -930,35 +962,59 @@ static void drawTreeSlot(M5Canvas& canvas, Slot& t, int16_t yOffset) {
         trunkHi   = fl(C_TRUNK_H);
     }
 
-    // Leaf palettes (winter bush = frosted ice; others by species)
-    const bool winter = (Weather::getActiveSeason() == Season::WINTER);
+    // Leaf palettes — always 3 shades (dark / mid / lit) for volume
+    const Season season = Weather::getActiveSeason();
+    const bool winter = (season == Season::WINTER);
+    const bool autumn = (season == Season::AUTUMN);
+    const bool spring = (season == Season::SPRING);
     uint16_t leafCol, leafLite, leafHi;
-    if (isBerry && winter) {
-        // Snowy winter bush
-        leafCol  = fl(0x9CD3);   // icy gray-blue
-        leafLite = fl(0xDEFB);   // near-white
-        leafHi   = fl(0xFFFF);   // snow cap
-    } else if (isBerry) {
-        leafCol  = fl(0x1C60);
-        leafLite = fl(0x3C80);
-        leafHi   = fl(0x64E0);
+    if (isBerry) {
+        if (winter) {
+            // Snowy winter bush
+            leafCol  = fl(0x6B6D);   // dark ice-gray (volume)
+            leafLite = fl(0xBDF7);   // mid
+            leafHi   = fl(0xFFFF);   // snow cap
+        } else if (autumn) {
+            // Same volume greens as summer bush (user liked summer look)
+            leafCol  = fl(0x0A20);
+            leafLite = fl(0x1C60);
+            leafHi   = fl(0x45A0);
+        } else if (spring) {
+            // Fresh spring bush — two greens + bright tip
+            leafCol  = fl(0x1C40);   // dark green
+            leafLite = fl(C_SPRING); // mid
+            leafHi   = fl(C_SPRING3);// light
+        } else {
+            // Summer bush — clear dark/mid for volume
+            leafCol  = fl(0x0A20);   // deep green (one tone below mid)
+            leafLite = fl(0x1C60);   // body green
+            leafHi   = fl(0x45A0);   // sunlit
+        }
     } else if (t.style == SeasonTree::BIRCH) {
-        leafCol  = fl(C_SPRING);
-        leafLite = fl(C_SPRING2);
+        leafCol  = fl(0x1C20);      // darker spring shadow
+        leafLite = fl(C_SPRING);
         leafHi   = fl(C_SPRING3);
     } else if (t.style == SeasonTree::OAK) {
-        leafCol  = fl(C_OAK1);
-        leafLite = fl(C_OAK2);
-        leafHi   = fl(C_OAK3);
+        leafCol  = fl(C_OAK3);      // brown-red dark
+        leafLite = fl(C_OAK1);      // orange
+        leafHi   = fl(C_OAK2);      // yellow
     } else if (isDecor) {
-        leafCol  = fl(0x1400);
-        leafLite = fl(C_DECOR_LEAF);
-        leafHi   = fl(0x3C60);
+        if (winter) {
+            // Classic winter tree (not fir) — cool green + snow will sit on leaves
+            leafCol  = fl(0x0A20);
+            leafLite = fl(0x1C40);
+            leafHi   = fl(0x9CD3);  // frosty rim
+        } else {
+            // Summer decor — same volume treatment as apple canopy
+            leafCol  = fl(0x0A00);
+            leafLite = fl(0x1C40);
+            leafHi   = fl(0x3C80);
+        }
     } else {
-        // summer apple tree foliage (darker so bright apples pop)
-        leafCol  = fl(0x1C00);
-        leafLite = fl(0x2C20);
-        leafHi   = fl(0x4C40);
+        // Summer apple tree — two greens + highlight (volume, not flat)
+        leafCol  = fl(0x0A00);      // darkest (one tone below body)
+        leafLite = fl(0x1C20);      // body green
+        leafHi   = fl(0x3C60);      // bright rim so apples pop
     }
 
     uint32_t now = millis();

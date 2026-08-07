@@ -1620,7 +1620,7 @@ void Avatar::drawFrame(M5Canvas& canvas, bool blink, bool faceRight, bool sniff)
             int dist = feetX - wx;
             if (dist < 0) dist = -dist;
             if (dist < 42) {
-                Wolf::scareAway();
+                Wolf::scareAway();  // plays WOLF_HIT
                 triggerSparkles(5);
                 triggerTailWiggle();
                 setState(AvatarState::HAPPY);
@@ -1774,6 +1774,10 @@ void Avatar::drawFrame(M5Canvas& canvas, bool blink, bool faceRight, bool sniff)
     if (s_manualWalk && millis() > s_manualWalkUntil) s_manualWalk = false;
     s_walkKick = (grassMoving || transitioning || attackHopActive || s_manualWalk) &&
                  (treeBonkPhase == 0);
+
+    // Winter: pig walks through drifts → melt a trampled path (протоптанная тропинка)
+    if (s_walkKick && shakeY >= -2)
+        SeasonalFx::trampleSnow(feetX);
 
     bool tailAlt = false;
     if (tailWiggleActive) {
@@ -1994,6 +1998,7 @@ void Avatar::updateGrass() {
         if (grassDirection) {
             grassOffset++;
             Trees::scroll(+1);
+            SeasonalFx::scroll(+1);  // snow banks ride the same treadmill
             if (grassOffset >= GRASS_STRIDE) {
                 grassOffset = 0;
                 GrassBlade last = grassBlades[GRASS_BLADE_COUNT - 1];
@@ -2005,6 +2010,7 @@ void Avatar::updateGrass() {
         } else {
             grassOffset--;
             Trees::scroll(-1);
+            SeasonalFx::scroll(-1);
             if (grassOffset < 0) {
                 grassOffset = GRASS_STRIDE - 1;
                 GrassBlade first = grassBlades[0];

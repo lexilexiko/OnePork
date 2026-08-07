@@ -2,8 +2,9 @@
 //
 // (1) FRUIT  — seasonal main tree (spring birch / summer green apple /
 //              autumn oak / winter fir); drops produce when applicable
-// (2) DECOR  — same seasonal species, no produce
-// (3) BERRY  — small bush; berries fall when stomped
+// (2) DECOR  — seasonal scenery; winter = classic snowy tree (not 2nd fir)
+// (3) BERRY  — bush; berries fall when stomped
+// Autumn oak tree drops soft green apples (bush stays berries)
 //
 // None push the pig. All can be broken by airborne stomps (jumps).
 // Call Trees::draw after sky/clouds, before pig.
