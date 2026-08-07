@@ -129,7 +129,9 @@ public:
     static void resetDimTimer();      // Call on any user input
     static void updateDimming();      // Call in update loop
     static bool isDimmed() { return dimmed; }
-    static void toggleScreenPower(); // Toggle screen on/off
+    static void toggleScreenPower(); // Toggle screen on/off (G0)
+    // True while G0 forced the panel to brightness 0 — pig scene is parked
+    static bool isScreenForcedOff() { return screenForcedOff; }
 
     // Screenshot
     static bool takeScreenshot();     // Save screen to SD card, returns success

@@ -270,6 +270,15 @@ uint8_t* Display::mainCanvasBuffer() { return s_mainCanvasBuf; }
 size_t   Display::mainCanvasBufferSize() { return kMainCanvasBytes; }
 
 void Display::update() {
+    // G0 screen-off: skip entire render path (sprites + push + 30fps delay).
+    // Mode logic still runs in porkchop.update(); pig scene is parked via
+    // suspendScene() in toggleScreenPower / wake paths. Big CPU/battery win
+    // for PigPass / TLS / long OINK sessions with panel dark.
+    if (screenForcedOff) {
+        HeapHealth::update();
+        return;
+    }
+
     SceneLayers::beginFrame();
 
     // Apply any pending top-bar message requests from worker tasks
@@ -3344,10 +3353,14 @@ void Display::drawFileTransferScreen(M5Canvas& canvas) {
 void Display::resetDimTimer() {
     lastActivityTime = millis();
     if (screenForcedOff) {
+        // Keyboard wake while G0 had the panel off
         screenForcedOff = false;
         dimmed = false;
         uint8_t brightness = Config::personality().brightness;
         M5.Display.setBrightness(brightness * 255 / 100);
+        Avatar::resumeScene();  // pair suspend from toggleScreenPower(off)
+        SFX::setScreenOffMuted(false);  // full sound back (IR mute bit may remain)
+        Serial.println("[DISPLAY] Screen wake (input) — scene+audio resume");
         return;
     }
     if (dimmed) {
@@ -3363,6 +3376,12 @@ void Display::toggleScreenPower() {
     if (screenForcedOff) {
         dimmed = true;
         M5.Display.setBrightness(0);
+        // Park pig world: weather/trees/wolf/mood anim + all SFX.
+        // Nested with PigPass/Xfer suspend (refcount) — safe either order.
+        // Mute uses MUTE_SCREEN_OFF bit so IR mute doesn't get clobbered.
+        Avatar::suspendScene();
+        SFX::setScreenOffMuted(true);  // stop + block play/tone/queue
+        Serial.println("[DISPLAY] Screen OFF (G0) — scene parked, full mute");
         return;
     }
 
@@ -3370,6 +3389,9 @@ void Display::toggleScreenPower() {
     lastActivityTime = millis();
     uint8_t brightness = Config::personality().brightness;
     M5.Display.setBrightness(brightness * 255 / 100);
+    Avatar::resumeScene();
+    SFX::setScreenOffMuted(false);
+    Serial.println("[DISPLAY] Screen ON (G0) — scene+audio resume");
 }
 
 void Display::updateDimming() {

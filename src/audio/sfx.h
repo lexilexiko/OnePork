@@ -103,9 +103,19 @@ bool isPlaying();
 // Stop current playback and clear queue
 void stop();
 
-// Hard mute (IR bitbang, etc.) — drops all play() until unmuted
+// Hard mute reasons (OR'd). play() silent while any reason is set.
+// IR bitbang and G0 screen-off stack without clobbering each other.
+static constexpr uint8_t MUTE_IR         = 1u << 0;
+static constexpr uint8_t MUTE_SCREEN_OFF = 1u << 1;
+
+// setMuted(true/false) toggles MUTE_IR (legacy IR paths)
 void setMuted(bool muted);
+// G0 brightness-0: silence everything until screen wakes
+void setScreenOffMuted(bool muted);
+// Any reason active?
 bool isMuted();
+// Current mute bit mask (debug / diagnostics)
+uint8_t muteMask();
 
 // Direct tone access (for special cases)
 void tone(uint16_t freq, uint16_t duration);

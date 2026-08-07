@@ -522,7 +522,8 @@ static Event eventQueue[QUEUE_SIZE];
 static volatile uint8_t queueHead = 0;  // next write position
 static volatile uint8_t queueTail = 0;  // next read position
 static portMUX_TYPE queueMutex = portMUX_INITIALIZER_UNLOCKED;
-static volatile bool s_muted = false;
+// Bitmask of MUTE_* reasons — play() only when zero
+static volatile uint8_t s_muteMask = 0;
 
 // ==[ IMPLEMENTATION ]==
 
@@ -550,7 +551,7 @@ void init() {
     currentStep = 0;
     queueHead = 0;
     queueTail = 0;
-    s_muted = false;
+    s_muteMask = 0;
     
     // Initialize queue
     for (int i = 0; i < QUEUE_SIZE; i++) {
@@ -558,17 +559,36 @@ void init() {
     }
 }
 
+static void applyMuteMask(uint8_t mask) {
+    s_muteMask = mask;
+    if (mask != 0) stop();
+}
+
 void setMuted(bool muted) {
-    s_muted = muted;
-    if (muted) stop();
+    // Legacy IR helper: only toggles MUTE_IR bit
+    uint8_t m = s_muteMask;
+    if (muted) m |= MUTE_IR;
+    else       m = (uint8_t)(m & ~MUTE_IR);
+    applyMuteMask(m);
+}
+
+void setScreenOffMuted(bool muted) {
+    uint8_t m = s_muteMask;
+    if (muted) m |= MUTE_SCREEN_OFF;
+    else       m = (uint8_t)(m & ~MUTE_SCREEN_OFF);
+    applyMuteMask(m);
 }
 
 bool isMuted() {
-    return s_muted;
+    return s_muteMask != 0;
+}
+
+uint8_t muteMask() {
+    return s_muteMask;
 }
 
 void play(Event event) {
-    if (s_muted) return;
+    if (s_muteMask != 0) return;
     if (Config::personality().soundLevel == 0) return;
     if (event == NONE) return;
     
@@ -629,7 +649,7 @@ static void startSequence(const Note* seq) {
 
 bool update() {
     // Skip if muted or sound disabled
-    if (s_muted || Config::personality().soundLevel == 0) {
+    if (s_muteMask != 0 || Config::personality().soundLevel == 0) {
         // Clear any queued events
         taskENTER_CRITICAL(&queueMutex);
         queueHead = queueTail;
@@ -887,7 +907,7 @@ void stop() {
 }
 
 void tone(uint16_t freq, uint16_t duration) {
-    if (s_muted) return;
+    if (s_muteMask != 0) return;
     if (Config::personality().soundLevel == 0) return;
     // Don't layer direct tones over an active sequence
     if (currentSequence != nullptr) return;
