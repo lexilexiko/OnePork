@@ -59,7 +59,13 @@ enum class XPEvent : uint8_t {
     // C5Lab / JanOS / JANUS HOG (v0.1.9+)
     SAE_COMMIT_SENT,        // +2 XP - SAE flood burst sent
     C5_CONNECTED,           // +25 XP - JanusHog board detected
-    C5_5GHZ_FOUND           // +5 XP - 5GHz network found via C5
+    C5_5GHZ_FOUND,          // +5 XP - 5GHz network found via C5
+    // One Pork fan activities (1.4+)
+    FRUIT_PICKED,           // +3 XP - pick fallen fruit / apples
+    WOLF_SCARE,             // +5 XP - jump/stomp scare wolf away
+    WOLF_HIDE,              // +8 XP - sit still, wolf passes by
+    PIGPASS_CRACK,          // +100 XP - cracked a password in PigPass
+    EVILPIG_CATCH           // +40 XP - portal password submission
 };
 
 // Achievement bitflags (uint64_t for 60 achievements)
@@ -188,6 +194,12 @@ struct PorkXPData {
     uint32_t mercyCount;        // Mid-attack exclusions (mercy kills)
     TitleOverride titleOverride; // Player-selected title override
     uint32_t unlockables;       // Unlockables bitfield (v0.1.8) - secret challenges
+    // One Pork fan counters (persist like HS/BLE)
+    uint32_t lifetimeFruit;     // Fruit / apples picked
+    uint32_t lifetimeWolfScare; // Wolves scared by jump/attack
+    uint32_t lifetimeWolfHide;  // Times sat still so wolf walked past
+    uint32_t lifetimePigpass;   // Passwords cracked in PigPass
+    uint32_t lifetimeEvilHits;  // EvilPig portal password catches
 };
 
 // Session-only stats (not persisted)

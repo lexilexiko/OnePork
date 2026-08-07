@@ -101,7 +101,13 @@ static const uint16_t XP_VALUES[] = {
     // C5Lab / JanOS / JANUS HOG (v0.1.9+)
     2,      // SAE_COMMIT_SENT - SAE flood burst
     25,     // C5_CONNECTED - JanusHog board detected
-    5       // C5_5GHZ_FOUND - 5GHz network via C5
+    5,      // C5_5GHZ_FOUND - 5GHz network via C5
+    // One Pork fan activities
+    3,      // FRUIT_PICKED
+    5,      // WOLF_SCARE
+    8,      // WOLF_HIDE
+    100,    // PIGPASS_CRACK
+    40      // EVILPIG_CATCH
 };
 
 // 10 class names (every 5 levels)
@@ -582,6 +588,11 @@ void XP::load() {
     data.mercyCount = prefs.getUInt("mercy", 0);
     data.titleOverride = static_cast<TitleOverride>(prefs.getUChar("titleo", 0));
     data.unlockables = prefs.getUInt("unlock", 0);  // Unlockables v0.1.8
+    data.lifetimeFruit = prefs.getUInt("fruit", 0);
+    data.lifetimeWolfScare = prefs.getUInt("wscare", 0);
+    data.lifetimeWolfHide = prefs.getUInt("whide", 0);
+    data.lifetimePigpass = prefs.getUInt("pigpass", 0);
+    data.lifetimeEvilHits = prefs.getUInt("evilhit", 0);
     lastSessionEpoch = prefs.getUInt("lastsess", 0);  // Return bonus tracking
     data.cachedLevel = calculateLevel(data.totalXP);
 
@@ -623,6 +634,11 @@ void XP::save() {
     prefs.putUInt("mercy", data.mercyCount);
     prefs.putUChar("titleo", static_cast<uint8_t>(data.titleOverride));
     prefs.putUInt("unlock", data.unlockables);  // Unlockables v0.1.8
+    prefs.putUInt("fruit", data.lifetimeFruit);
+    prefs.putUInt("wscare", data.lifetimeWolfScare);
+    prefs.putUInt("whide", data.lifetimeWolfHide);
+    prefs.putUInt("pigpass", data.lifetimePigpass);
+    prefs.putUInt("evilhit", data.lifetimeEvilHits);
     // Update last session epoch for return bonus tracking
     {
         time_t now = time(nullptr);
@@ -954,6 +970,21 @@ void XP::addXP(XPEvent event) {
             amount = SESSION_XP[tier][col];
             break;
         }
+        case XPEvent::FRUIT_PICKED:
+            data.lifetimeFruit++;
+            break;
+        case XPEvent::WOLF_SCARE:
+            data.lifetimeWolfScare++;
+            break;
+        case XPEvent::WOLF_HIDE:
+            data.lifetimeWolfHide++;
+            break;
+        case XPEvent::PIGPASS_CRACK:
+            data.lifetimePigpass++;
+            break;
+        case XPEvent::EVILPIG_CATCH:
+            data.lifetimeEvilHits++;
+            break;
         default:
             break;
     }

@@ -2,8 +2,8 @@
                     Volume Zero, Issue 3, Phile 1 of 1
 
                           M5PORKCHOP README
-                          v0.1.8c (1.4)
-                   (upstream 0.1.8c · One Pork fan package 1.4)
+                          v0.1.8c (1.4.1)
+                   (upstream 0.1.8c · One Pork fan package 1.4.1)
 
                             ^__^
                             (oo)\_______
@@ -35,7 +35,7 @@
     12. TROUBLESHOOTING (the confessional)
     13. GREETZ
     14. RECENT PORK (v0.1.8c community pass + thank you)
-    15. ONE PORK v0.1.8c (1.4) — fan packaging; donate the original
+    15. ONE PORK v0.1.8c (1.4.1) — fan packaging; donate the original
 
     (pro tip: CTRL+F "horse" for enlightenment.
      we counted them. the horse counted more.
@@ -1357,8 +1357,8 @@
     upstream official:
         github.com/0ct0sec/M5PORKCHOP/releases
 
-    One Pork fan binary (this tree, v0.1.8c (1.4)):
-        releases/OnePork_v0.1.8c-1.4_m5cardputer_firmware.bin
+    One Pork fan binary (this tree, v0.1.8c (1.4.1)):
+        releases/OnePork_v0.1.8c-1.4.1_m5cardputer_firmware.bin
         (on GitHub: repo → releases/ folder or Releases page if published)
 
     1. download firmware.bin
@@ -1689,11 +1689,11 @@
 
 ------------------------------------------------------------------------
 
---[ 15 - ONE PORK v0.1.8c (1.4) (FAN PACKAGING)
+--[ 15 - ONE PORK v0.1.8c (1.4.1) (FAN PACKAGING)
 
-    VERSION: **v0.1.8c (1.4)**
-        - 0.1.8c  = last known upstream M5PORKCHOP line this tree is based on
-        - (1.4)   = One Pork fan package revision
+    VERSION: **v0.1.8c (1.4.1)**
+        - 0.1.8c   = last known upstream M5PORKCHOP line this tree is based on
+        - (1.4.1)  = One Pork fan package revision (1.4 + post-ship fixes)
 
     this folder may be published as **One Pork** — a fan / community
     packaging of M5PORKCHOP. it is NOT a rewrite of authorship.
@@ -1712,21 +1712,29 @@
     full fan changelog + tree map: **FAN.md**
 
 
-----[ 15.2 - WHAT 1.4 ADDED / FIXED (SHORT)
+----[ 15.2 - WHAT 1.4 / 1.4.1 ADDED / FIXED (SHORT)
 
-    NEW:
+    NEW (1.4):
     - [I] 1RP0RK    — IR power blast (N4/EU packs), custom SD /ir/*.txt
     - [G] FRUITRUN  — orchard mini-game (lives, wolf pressure)
-    - RANK hub      — FLEXES / DEMANDS / BADGES / UNLOCK / FRUITRUN
+    - RANK hub      — FLEXES / BADGES / UNLOCK / FRUITRUN (no DEMANDS row)
     - FLEXES GR1ND  — “do this = +XP = pig LVL up” cheat sheet tab
     - seasons       — cherry / apple / old apple / fir + world FX
-    - boot / ABOUT  — 0N3 P0RK branding + v0.1.8c (1.4) stamp
+    - boot / ABOUT  — 0N3 P0RK branding + version stamp
+    - fan XP        — fruit pick, wolf scare/hide, PigPass crack, EvilPig catch
+    - ST4TS rows    — FRU1T / W0LF H1T / H1D3 / CR4CK / EV1L H1T (NVS)
 
-    FIXED:
+    FIXED (1.4):
     - [B] BLUES cold start reboot/black screen
           (free NetworkRecon table before NimBLE; OINK-handoff class fix)
     - IR TX mutes piezo during blast
     - monologue timing: 5s show, 15s silence
+
+    FIXED (1.4.1):
+    - [E] EVILPIG captive portal auto-open on phone
+          (HTTP 200 portal page on generate_204 / hotspot-detect / etc.,
+           fixed 192.168.4.1 gateway, DNS TTL 0, multi-pump DNS+HTTP,
+           Connection: close + no-cache — phones open login sheet again)
 
     SCENE (carried):
     - trees + drops, wolf visitor, seasonal FX, free-roam IDLE polish
@@ -1742,10 +1750,11 @@
 
     MENU → RANK:
         FLEXES   [S]   LVL, XP bar, ST4TS / B00ST / GR1ND / W1GL3
-        DEMANDS  [1]   session challenges — XP rewards
         BADGES         achievements / pr00f
         UNLOCK         secret unlockables
         FRUITRUN [G]   orchard mini-game (XP on fruit)
+
+    (session DEMANDS / dailies still on hotkey **1**, not inside RANK)
 
     the pig is still an RPG. street cred is still cheese.
     the numbers still lie less than your neighbors.

@@ -1643,7 +1643,7 @@ void Display::showBootSplash() {
 
     M5.Display.setTextSize(1);
     M5.Display.drawString("F4N BU1LD 0F M5P0RKCH0P", DISPLAY_W / 2, DISPLAY_H / 2 + 12);
-    M5.Display.drawString("v0.1.8c (1.4)  0N3 P0RK", DISPLAY_W / 2, DISPLAY_H / 2 + 24);
+    M5.Display.drawString("v0.1.8c (1.4.1) 0N3 P0RK", DISPLAY_W / 2, DISPLAY_H / 2 + 24);
     M5.Display.drawString("D0N4T3 0ct0. FL3X L3X1.", DISPLAY_W / 2, DISPLAY_H / 2 + 36);
 
     bootSplashDelay(700);
@@ -3105,7 +3105,7 @@ void Display::drawAboutScreen(M5Canvas& canvas) {
     
     canvas.setTextSize(1);
     canvas.setTextColor(UiStyle::CYAN);
-    canvas.drawString("v0.1.8c (1.4)", DISPLAY_W / 2, 20);
+    canvas.drawString("v0.1.8c (1.4.1)", DISPLAY_W / 2, 20);
 
     // Upstream creator first (always)
     canvas.setTextColor(COLOR_FG);

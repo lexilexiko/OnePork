@@ -1,8 +1,8 @@
 # One Pork — fan build notes
 
-**Version: v0.1.8c (1.4)**  
+**Version: v0.1.8c (1.4.1)**  
 - `0.1.8c` — last known upstream M5PORKCHOP base  
-- `(1.4)` — One Pork fan package revision
+- `(1.4.1)` — One Pork fan package revision
 
 This tree is a **fan / community packaging** of **M5PORKCHOP**.
 
@@ -44,23 +44,31 @@ License: MIT — Copyright (c) 2025 **0ct0** (`LICENSE`).
 
 ---
 
-## v1.4 changelog
+## v1.4 / 1.4.1 changelog
 
-### New
+### New (1.4)
 
 - **1RP0RK [I]** — IR power blaster (builtin N4/EU packs + custom `/ir/*.txt` on SD)
 - **FRUITRUN [G]** — orchard mini-game (goal, lives, wolf pressure)
-- **RANK hub** — FLEXES / DEMANDS / BADGES / UNLOCK / FRUITRUN (street-cred RPG map)
+- **RANK hub** — FLEXES / BADGES / UNLOCK / FRUITRUN (DEMANDS stays on hotkey **1**)
 - **FLEXES → GR1ND tab** — what to do for XP so pig LVL goes up
-- **Seasons** — spring cherry, summer apple, autumn old apple, winter fir + FX (snow path, leaves, butterflies…)
+- **Fan XP + ST4TS** — fruit / wolf scare+hide / PigPass crack / EvilPig catch (NVS)
+- **Seasons** — spring cherry, summer apple, autumn old apple, winter fir + FX
 - **Wolf / trees / monologue polish** (5s show → 15s silence)
-- **Boot / About** — One Pork branding + **v0.1.8c (1.4)** on splash & ABOUTPIG
+- **Boot / About** — One Pork branding + version stamp
 
-### Fixed
+### Fixed (1.4)
 
-- **BLUES [B]** cold start hard-reset/black screen: stop NetworkRecon **and free networks table** (~19KB) before NimBLE (same class of fix as OINK warm-up / XFER handoff). Running OINK first “worked” because it exercised WiFi; B now does the proper radio handoff alone.
+- **BLUES [B]** cold start hard-reset/black screen: stop NetworkRecon **and free networks table** (~19KB) before NimBLE (OINK-handoff class fix)
 - IR TX mutes speaker during blast (less piezo glitch)
 - Scene suspend stays on heavy CPU modes (PigPass / EvilPig / Xfer)
+
+### Fixed (1.4.1)
+
+- **EVILPIG [E]** captive portal auto-open on phones again  
+  - probes (`/generate_204`, `/hotspot-detect.html`, etc.) return **portal HTML 200** (not “online”)  
+  - fixed gateway **192.168.4.1**, DNS wildcard + TTL 0, multi-pump DNS+HTTP  
+  - `Connection: close` + no-cache headers  
 
 ### Notes
 
@@ -134,7 +142,7 @@ In 1RP0RK: **E** = pick file, **SPC** = fire, **R** = N4/EU region, **B** = buil
 
 Prebuilt binary (when shipped):
 
-- `releases/OnePork_v0.1.8c-1.4_m5cardputer_firmware.bin`
+- `releases/OnePork_v0.1.8c-1.4.1_m5cardputer_firmware.bin`
 
 Flash with M5 Launcher / M5Burner / `esptool`.  
 XP is kept if you update via M5 Launcher (do not wipe NVS).

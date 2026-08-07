@@ -276,12 +276,12 @@ void Porkchop::init() {
     Avatar::setState(AvatarState::HAPPY);
     
     // SFX::init() already called in setup() for boot sound — don't re-init
-    // Short patch notes after splash — One Pork 1.4
+    // Boot toast: highlight big new features (not last bugfix)
     Display::showToast(
-        "1.4: 1RP0RK  FRU1T  S3AS0N  RANK\n"
-        "FIX: BLUES OINK-HANDOFF  GR1ND\n"
-        "I=IR  G=FRUIT  S=FLEXES",
-        2400
+        "NEW: 1RP0RK  FRU1TRUN  S3AS0N\n"
+        "RANK  FL3X3S+GR1ND  W0LF\n"
+        "I=IR  G=FRUIT  S=STATS",
+        2600
     );
     
     Serial.println("[PORKCHOP] Initialized");

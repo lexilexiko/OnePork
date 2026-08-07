@@ -693,14 +693,14 @@ void FlexesScreen::drawGrindTab(M5Canvas& canvas) {
     // What actions award XP toward next level
     static const char* const LINES[] = {
         "O1NK  HS +50  PMK1D +75  nets +1",
-        "DNH   pass1ve nets +2  gh0st +150",
-        "W4RH0G walk +30 XP / km",
         "BLU3S BLE spam +XP  exit +15",
-        "P1GP4SS crack pass = flex XP",
-        "D3M4NDS (1) dailies = big XP",
-        "FRU1T (G) pick fruit = +XP",
-        "UPL0AD W1GL3/WPA-SEC bon4s XP",
-        "S3SS10N 30/60/120m +10/+25/+50",
+        "FRU1T pick apple/berry +3 each",
+        "W0LF  scare +5  sit/hide +8",
+        "P1GP4SS crack passw0rd +100",
+        "EV1LP1G portal catch +40",
+        "W4RH0G walk +30 / km",
+        "DNH   pass1ve +2  gh0st +150",
+        "UPL0AD W1GL3/WPA-SEC bon4s",
         "M0R3 XP = H1GH3R LVL 4 P1G",
     };
     int y = 38;
@@ -844,10 +844,35 @@ void FlexesScreen::drawStats(M5Canvas& canvas) {
 
     y += lineH;
 
-    // Row 5: Roulette (PiggyBlues no-reboot)
-    canvas.drawString("JST R0UL3T:", col1, y);
-    snprintf(buf, sizeof(buf), "%lu", (unsigned long)data.rouletteWins);
+    // Row 5: Fan activity — fruit / wolf scare
+    canvas.drawString("FRU1T:", col1, y);
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)data.lifetimeFruit);
     canvas.drawString(buf, col2, y);
+
+    canvas.drawString("W0LF H1T:", col3, y);
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)data.lifetimeWolfScare);
+    canvas.drawString(buf, col4, y);
+
+    y += lineH;
+
+    // Row 6: hide from wolf / crack / evil portal
+    canvas.drawString("H1D3:", col1, y);
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)data.lifetimeWolfHide);
+    canvas.drawString(buf, col2, y);
+
+    canvas.drawString("CR4CK:", col3, y);
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)data.lifetimePigpass);
+    canvas.drawString(buf, col4, y);
+
+    y += lineH;
+
+    canvas.drawString("EV1L H1T:", col1, y);
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)data.lifetimeEvilHits);
+    canvas.drawString(buf, col2, y);
+
+    canvas.drawString("R0UL3T:", col3, y);
+    snprintf(buf, sizeof(buf), "%lu", (unsigned long)data.rouletteWins);
+    canvas.drawString(buf, col4, y);
 }
 
 // Draw the WiGLE statistics tab. This function reads the cached

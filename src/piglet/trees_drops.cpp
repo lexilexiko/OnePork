@@ -4,6 +4,7 @@
 #include "trees.h"
 #include "avatar.h"
 #include "../ui/display.h"
+#include "../core/xp.h"
 #include <esp_random.h>
 
 namespace Trees {
@@ -324,6 +325,8 @@ bool tryCollectNearbyFruit(int pigCenterX, int pigFeetY, int radius) {
         const int radX = (drops[i].groundSince != 0) ? (radius + 14) : (radius + 10);
         if (dx <= radX && dy <= radY) {
             drops[i].active = false;
+            // Same path as HS/BLE: event awards XP + lifetime counter (NVS)
+            XP::addXP(XPEvent::FRUIT_PICKED);
             return true;
         }
     }

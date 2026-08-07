@@ -1234,7 +1234,7 @@ void PigpassMode::markFound(const char* password, bool cached) {
     strncpy(foundPw, password, sizeof(foundPw) - 1);
     foundPw[sizeof(foundPw) - 1] = '\0';
     if (!cached) {
-        XP::addXP(100);
+        XP::addXP(XPEvent::PIGPASS_CRACK);  // +100 + lifetime counter
         saveCrackedResult(password);
         SDLog::log("PIGPASS", "PASSWORD FOUND: %s", password);
         Serial.printf("[PIGPASS] PASSWORD FOUND: %s\n", password);

@@ -7,6 +7,7 @@
 #include "../ui/display.h"
 #include "../audio/sfx.h"
 #include "../core/config.h"
+#include "../core/xp.h"
 #include <esp_random.h>
 #include <math.h>
 
@@ -192,6 +193,7 @@ void scareAway() {
     }
     w.howled = true;
     SFX::play(SFX::WOLF_HIT);
+    XP::addXP(XPEvent::WOLF_SCARE);
 }
 
 void scareNear(int feetX, int radius) {
@@ -215,7 +217,10 @@ void scareNear(int feetX, int radius) {
         w.howled = true;
         any = true;
     }
-    if (any) SFX::play(SFX::WOLF_HIT);
+    if (any) {
+        SFX::play(SFX::WOLF_HIT);
+        XP::addXP(XPEvent::WOLF_SCARE);
+    }
 }
 
 static void updateActor(Actor& w, uint32_t now) {
@@ -254,10 +259,12 @@ static void updateActor(Actor& w, uint32_t now) {
             float adx = dx < 0 ? -dx : dx;
             if (adx < (float)SCARE_DIST) {
                 if (pigSitting) {
+                    // Hide / freeze — wolf loses interest and walks past
                     w.phase = Phase::LEAVE;
                     w.phaseStartMs = now;
                     if (w.faceRight) w.vx = LEAVE_SPEED * 0.95f;
                     else             w.vx = -LEAVE_SPEED * 0.95f;
+                    XP::addXP(XPEvent::WOLF_HIDE);
                 } else {
                     w.phase = Phase::SCARE;
                     w.phaseStartMs = now;

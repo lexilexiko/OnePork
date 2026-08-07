@@ -235,10 +235,9 @@ const MenuItem Menu::GROUP_COMMS[] = {
 };
 const uint8_t Menu::GROUP_COMMS_SIZE = sizeof(GROUP_COMMS) / sizeof(GROUP_COMMS[0]);
 
-// Group: RANK - progression and street cred (original labels)
+// Group: RANK - progression and street cred (no DEMANDS — still on hotkey 1)
 const MenuItem Menu::GROUP_RANK[] = {
     {"^#", "FLEXES",   11, H_FLEX,     (uint8_t)(sizeof(H_FLEX)/sizeof(H_FLEX[0]))},
-    {"1#", "DEMANDS",  29, H_DEMANDS,  (uint8_t)(sizeof(H_DEMANDS)/sizeof(H_DEMANDS[0]))},
     {"*#", "BADGES",    9, H_BADGES,   (uint8_t)(sizeof(H_BADGES)/sizeof(H_BADGES[0]))},
     {"?*", "UNLOCK",   15, H_SNOUTS,   (uint8_t)(sizeof(H_SNOUTS)/sizeof(H_SNOUTS[0]))},
     {"g)", "FRUITRUN", 27, H_FRUITRUN, (uint8_t)(sizeof(H_FRUITRUN)/sizeof(H_FRUITRUN[0]))}

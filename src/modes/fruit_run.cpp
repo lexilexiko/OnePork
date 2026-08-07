@@ -124,12 +124,8 @@ void FruitRunMode::start() {
 }
 
 void FruitRunMode::stop() {
-    if (fruitsGot > 0) {
-        if (score > bestScore) bestScore = score;
-        uint16_t xp = fruitsGot / 10;
-        if (xp > 40) xp = 40;
-        if (xp > 0) XP::addXPSilent(xp);
-    }
+    // Per-fruit XP already awarded via FRUIT_PICKED on collect
+    if (fruitsGot > 0 && score > bestScore) bestScore = score;
     running = false;
     phase = Phase::TITLE;
     Wolf::setAutoSpawn(true);

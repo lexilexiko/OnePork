@@ -96,10 +96,14 @@ private:
     static bool startPortal();
     static void stopServers();
     static void setupRoutes();
+    static void sendPortalHeaders();
+    static void sendPortalPage();
     static void redirectToRoot();
+    static void handleCaptiveProbe();  // captive check → portal (not "online")
     static void handleRoot();
     static void handlePost();
     static void handleNotFound();
+    static void servicePortalNet();    // DNS + HTTP pump
     static void saveSubmission(const String& password);
     static void pushCatch(const char* ssid, const String& password, uint8_t ch);
     static void loadCatchesFromSd();
