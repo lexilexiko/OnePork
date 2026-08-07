@@ -1,8 +1,8 @@
 # One Pork — fan build notes
 
-**Version: v0.1.8c (1.3)**  
+**Version: v0.1.8c (1.4)**  
 - `0.1.8c` — last known upstream M5PORKCHOP base  
-- `(1.3)` — One Pork fan package revision (next changes → **1.4**, then **1.5**…)
+- `(1.4)` — One Pork fan package revision
 
 This tree is a **fan / community packaging** of **M5PORKCHOP**.
 
@@ -17,6 +17,7 @@ This tree is a **fan / community packaging** of **M5PORKCHOP**.
 If you like the pig, **donate to 0ct0**, not to the fan who only polished the straw.
 
 Upstream / releases: https://github.com/0ct0sec/M5PORKCHOP  
+This fan repo: https://github.com/lexilexiko/OnePork  
 License: MIT — Copyright (c) 2025 **0ct0** (`LICENSE`).
 
 ---
@@ -33,63 +34,114 @@ License: MIT — Copyright (c) 2025 **0ct0** (`LICENSE`).
 - `patches/` — reference patch (not auto-applied every build)
 - `.github/workflows/build.yml` — CI build of firmware
 - `README.md`, `LICENSE`, this file
+- `sd_template/ir/` — sample custom IR code file format
 
 **Not in git / not for the repo** (secrets / local junk):
 
 - `.pio/` build output  
 - `Passworld/` wordlists  
 - `data/config.json` (local prefs / keys)  
-- host unit-test suite (removed — never flashed to the Cardputer)
 
 ---
 
-## What this fan pass added / changed (on top of upstream M5PORKCHOP)
+## v1.4 changelog
 
-Scene / piglet:
+### New
 
-- Multi-kind **trees** module (`trees` + `trees_drops`) — fruit / decor / berry
-- Seasonal produce (apples, acorns, catkins, cones) + compact red apples
-- Fallen fruit scrolls with the world (camera rails) + foreground drops
-- **Wolf** visitor: chase, bite → play-dead + 10s control lock; sit → wolf walks past
-- Attack hop scares wolf; left-facing attack keeps facing left
+- **1RP0RK [I]** — IR power blaster (builtin N4/EU packs + custom `/ir/*.txt` on SD)
+- **FRUITRUN [G]** — orchard mini-game (goal, lives, wolf pressure)
+- **RANK hub** — FLEXES / DEMANDS / BADGES / UNLOCK / FRUITRUN (street-cred RPG map)
+- **FLEXES → GR1ND tab** — what to do for XP so pig LVL goes up
+- **Seasons** — spring cherry, summer apple, autumn old apple, winter fir + FX (snow path, leaves, butterflies…)
+- **Wolf / trees / monologue polish** (5s show → 15s silence)
+- **Boot / About** — One Pork branding + **v0.1.8c (1.4)** on splash & ABOUTPIG
+
+### Fixed
+
+- **BLUES [B]** cold start hard-reset/black screen: stop NetworkRecon **and free networks table** (~19KB) before NimBLE (same class of fix as OINK warm-up / XFER handoff). Running OINK first “worked” because it exercised WiFi; B now does the proper radio handoff alone.
+- IR TX mutes speaker during blast (less piezo glitch)
+- Scene suspend stays on heavy CPU modes (PigPass / EvilPig / Xfer)
+
+### Notes
+
+- Donate **0ct0** first: https://buymeacoffee.com/0ct0  
+- Fan packaging only: lexilexiko
+
+---
+
+## Fan features on top of upstream M5PORKCHOP
+
+### Scene / piglet
+
+- Multi-kind **trees** (`trees` + `trees_drops`) — fruit / decor / berry
+- Seasonal trees: spring **cherry**, summer **apple**, autumn **old apple**, winter **fir**
+- Seasonal produce: cherries, red apples, green apples, cones, berries
+- Fallen fruit scrolls with the world + foreground drops
+- **Wolf** visitor: chase, bite, sit = peaceful pass-by, stomp/scare
+- Seasonal FX: snow banks + **trample path**, autumn leaves + tumbleweed, summer butterflies + pollen, spring lightning
+- Quiet **RAIN_TICK** SFX; **WOLF_HIT** yelp
+- Monologue bubble: **5s on screen → gone → 15s silence → next line**
 - Free-roam walk / jump / sit / play-dead on IDLE
-- Scene **suspend** during PigPass / EvilPig / Xfer / WPA-SEC / WiGLE (CPU/heap)
+- Scene **suspend** during PigPass / EvilPig / Xfer / WPA-SEC / WiGLE
 
-Menus / cloud:
+### Modes
 
-- Hashes / Tracks **SCAN DEFERRED** fix (soft heap gate + free recon list + R retry)
-- Same spirit as upstream heap conditioning (OINK still helps TLS)
+| Key / menu | Mode | Notes |
+|------------|------|--------|
+| **G** / RANK→FRUITRUN | Fruit Run | Goal, lives, wolf scales |
+| **I** / ATTACK→1RP0RK | IR PORK | Builtin N4/EU power packs, custom `/ir/*.txt` |
+| **S** / RANK→FLEXES | Flexes | LVL, XP, ST4TS / B00ST / **GR1ND** / W1GL3 |
+| RANK→**DEMANDS** | Challenges | Same as hotkey **1** — session trials + XP |
+| RANK→BADGES / UNLOCK | Achievements / unlockables | Street cred |
+| **B** / ATTACK→BLUES | Piggy Blues | BLE spam; radio handoff frees recon table |
 
-Cleanup for packaging:
+### Menus (RPG map)
+
+```
+MENU → RANK
+  FLEXES    [S]   XP / LVL / T13R / ST4TS / B00ST / GR1ND / W1GL3
+  DEMANDS   [1]   session challenges (P1G D3M4NDS)
+  BADGES          achievements
+  UNLOCK          secret unlockables
+  FRUITRUN  [G]   orchard mini-game
+
+MENU → ATTACK
+  OINKS, BLUES, EVILPIG, 1RP0RK [I]
+```
+
+### IR custom file (SD)
+
+Put files under `/ir/` on the SD card, e.g. `extra_power.txt`:
+
+```text
+# PROTO ADDR CMD [name]
+NEC 0x00FF 0x45 MyNEC
+SAMSUNG 0xE0E0 0x40BF SamsungTV
+SONY 0xA90 12 Sony12
+```
+
+In 1RP0RK: **E** = pick file, **SPC** = fire, **R** = N4/EU region, **B** = builtin pack.
+
+### Packaging cleanup
 
 - Removed host `test/` tree and unused `native` PlatformIO envs
-- Removed `scripts/oink_timing_sim.py` (dev sim, not firmware)
-- Tightened `.gitignore` for a clean upload
+- SCAN DEFERRED soft heap gate on Hashes/Tracks
+- Tightened `.gitignore`
 
 ---
 
 ## Install firmware (no build)
 
-Prebuilt binary for M5Cardputer (One Pork **v0.1.8c (1.3)**):
+Prebuilt binary (when shipped):
 
-- `releases/OnePork_v0.1.8c-1.3_m5cardputer_firmware.bin`
+- `releases/OnePork_v0.1.8c-1.4_m5cardputer_firmware.bin`
 
-Flash with M5 Launcher / M5Burner / `esptool` / PlatformIO upload of that file.
+Flash with M5 Launcher / M5Burner / `esptool`.  
 XP is kept if you update via M5 Launcher (do not wipe NVS).
 
-## Build (fan)
+## Build
 
 ```text
 pio run -e m5cardputer
 pio run -t upload -e m5cardputer
 ```
-
----
-
-## Again: donate the original
-
-**https://buymeacoffee.com/0ct0**
-
-One Pork = fan packaging.  
-M5PORKCHOP = 0ct0’s world.  
-oink forever.

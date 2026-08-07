@@ -1,7 +1,7 @@
 # Prebuilt firmware (One Pork)
 
-**Version:** v0.1.8c (1.3)  
-**File:** `OnePork_v0.1.8c-1.3_m5cardputer_firmware.bin`  
+**Version:** v0.1.8c (1.4)  
+**File:** `OnePork_v0.1.8c-1.4_m5cardputer_firmware.bin`  
 **Target:** M5Cardputer (ESP32-S3 StampS3)
 
 ## Install
@@ -15,4 +15,5 @@
 - **Original author:** 0ct0 — donate: https://buymeacoffee.com/0ct0  
 - **Fan packaging:** lexilexiko only (not the author)
 
-Upstream: https://github.com/0ct0sec/M5PORKCHOP
+Upstream: https://github.com/0ct0sec/M5PORKCHOP  
+Fan repo: https://github.com/lexilexiko/OnePork

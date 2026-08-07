@@ -33,6 +33,7 @@
 #include "../modes/micpork.h"
 #include "../modes/evilpig.h"
 #include "../modes/fruit_run.h"
+#include "../modes/ir_pork.h"
 #include "../web/xfer_server.h"
 #include "../audio/sfx.h"
 #include "config.h"
@@ -79,6 +80,7 @@ static const char* modeToString(PorkchopMode mode) {
         case PorkchopMode::EVILPIG_MODE: return "EVILPIG";
         case PorkchopMode::FILES_MODE: return "FILES";
         case PorkchopMode::FRUIT_RUN_MODE: return "FRUITRUN";
+        case PorkchopMode::IR_PORK_MODE: return "IRPORK";
         case PorkchopMode::ABOUT: return "ABOUT";
         default: return "UNKNOWN";
     }
@@ -248,6 +250,8 @@ void Porkchop::init() {
             case 25: setMode(PorkchopMode::EVILPIG_MODE); break;
             case 26: setMode(PorkchopMode::FILES_MODE); break;
             case 27: setMode(PorkchopMode::FRUIT_RUN_MODE); break;
+            case 28: setMode(PorkchopMode::IR_PORK_MODE); break;
+            case 29: Display::showChallenges(); break;  // RANK → D3M4NDS (session trials)
         }
     });
 
@@ -272,12 +276,12 @@ void Porkchop::init() {
     Avatar::setState(AvatarState::HAPPY);
     
     // SFX::init() already called in setup() for boot sound — don't re-init
-    // Short patch notes after splash (was 5s health lecture — now real changelog, ~2.2s)
+    // Short patch notes after splash — One Pork 1.4
     Display::showToast(
-        "ADDED: FILES  PIGPASS RESUME/MASK\n"
-        "FIX: EVILPIG  BLUES CLEAN EXIT\n"
-        "P=PIGPASS  0=SCREENSHOT",
-        2200
+        "1.4: 1RP0RK  FRU1T  S3AS0N  RANK\n"
+        "FIX: BLUES OINK-HANDOFF  GR1ND\n"
+        "I=IR  G=FRUIT  S=FLEXES",
+        2400
     );
     
     Serial.println("[PORKCHOP] Initialized");
@@ -366,8 +370,8 @@ void Porkchop::setMode(PorkchopMode mode) {
         (unsigned)esp_get_free_heap_size(),
         (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
-    // Park pig scene during CPU/heap-heavy modes so mood/weather/wolf don't
-    // compete with PigPass PBKDF2, EvilPig SoftAP, or File Xfer.
+    // Park pig scene during CPU/heap-heavy modes so mood/weather/wolf
+    // don't compete with PBKDF2, SoftAP, or TLS xfer. (BLUES left alone — stock path.)
     auto isSceneHeavy = [](PorkchopMode m) {
         return m == PorkchopMode::PIGPASS_MODE ||
                m == PorkchopMode::EVILPIG_MODE ||
@@ -469,6 +473,9 @@ void Porkchop::setMode(PorkchopMode mode) {
             break;
         case PorkchopMode::FRUIT_RUN_MODE:
             FruitRunMode::stop();
+            break;
+        case PorkchopMode::IR_PORK_MODE:
+            IrPorkMode::stop();
             break;
         default:
             break;
@@ -607,6 +614,12 @@ void Porkchop::setMode(PorkchopMode mode) {
             SDLog::log("PORK", "Mode: FRUIT_RUN");
             FruitRunMode::init();
             FruitRunMode::start();
+            break;
+        case PorkchopMode::IR_PORK_MODE:
+            Avatar::setState(AvatarState::HUNTING);
+            SDLog::log("PORK", "Mode: IR_PORK");
+            IrPorkMode::init();
+            IrPorkMode::start();
             break;
         case PorkchopMode::EVILPIG_MODE:
             SDLog::log("PORK", "Mode: EVILPIG");
@@ -1140,6 +1153,12 @@ void Porkchop::handleInput() {
             setMode(PorkchopMode::FRUIT_RUN_MODE);
             return;
         }
+        // I — IR PORK blaster (power brute + custom files)
+        if (M5Cardputer.Keyboard.isKeyPressed('i') ||
+            M5Cardputer.Keyboard.isKeyPressed('I')) {
+            setMode(PorkchopMode::IR_PORK_MODE);
+            return;
+        }
         if (M5Cardputer.Keyboard.isKeyPressed('1')) {
             Display::showChallenges();
             return;
@@ -1274,6 +1293,12 @@ void Porkchop::updateMode() {
         case PorkchopMode::FRUIT_RUN_MODE:
             FruitRunMode::update();
             if (!FruitRunMode::isRunning()) {
+                setMode(PorkchopMode::IDLE);
+            }
+            break;
+        case PorkchopMode::IR_PORK_MODE:
+            IrPorkMode::update();
+            if (!IrPorkMode::isRunning()) {
                 setMode(PorkchopMode::IDLE);
             }
             break;

@@ -2,8 +2,8 @@
                     Volume Zero, Issue 3, Phile 1 of 1
 
                           M5PORKCHOP README
-                          v0.1.8c (1.3)
-                   (upstream 0.1.8c · One Pork fan package 1.3)
+                          v0.1.8c (1.4)
+                   (upstream 0.1.8c · One Pork fan package 1.4)
 
                             ^__^
                             (oo)\_______
@@ -35,7 +35,7 @@
     12. TROUBLESHOOTING (the confessional)
     13. GREETZ
     14. RECENT PORK (v0.1.8c community pass + thank you)
-    15. ONE PORK v0.1.8c (1.3) — fan packaging; donate the original
+    15. ONE PORK v0.1.8c (1.4) — fan packaging; donate the original
 
     (pro tip: CTRL+F "horse" for enlightenment.
      we counted them. the horse counted more.
@@ -51,13 +51,15 @@
 | [H] SPECTRUM      - 2.4 + 5GHz RF. sinc lobes. physics.      | 
 | [B] PIGGY BLUES   - BLE spam. YOU DIED. in that order.       |
 | [F] FILE XFER     - web UI. civilization achieved.           |
-| [G] FRUIT RUN     - walk, jump, catch tree fruit. no death.  |
+| [G] FRU1TRUN      - 1000 fruit. 3 lives. wolves scale.       |
+| [I] 1RP0RK        - IR power blast. N4/3U. custom /ir files. |
 | [P] PIGPASS       - WPA2 lab cracker. resume/mask.           |
 | [M] MICPORK       - pig is the spectrometer. speak bacon.    |
 | [E] EVILPIG       - SoftAP captive portal (lab).             |
+| [S] FL3X3S        - LVL / XP / T13R / ST4TS (RPG hub).        |
 | [*] BACON         - fake beacons. via MENU. worth the trip.  |
 |                                                              |
-| [1] PIG DEMANDS   - session challenges. three trials.        |
+| [1] D3M4NDS       - session challenges. three trials.        |
 | [2] PIGSYNC       - the prodigal son answers the phone.      |
 | [0] SCREENSHOT    - BMP to SD. for bragging rights.          |
 |                                                              |
@@ -1197,18 +1199,42 @@
     [G0] configurable magic button (set in settings)
 
 
-----[ 8.3b - FRUIT RUN (same IDLE world)
+----[ 8.3b - FRU1TRUN (orchard RPG mini-game)
 
-    no obstacles. you cannot die. the pig just harvests.
+    goal: 1000 fruit. 3 lives. wolf spawn chance rises with score.
+    after 1000: hard mode, dual wolves. jump/attack scares wolves.
 
-        [;] [,] [A]     walk left
-        [.] [/] [D]     walk right
-        [SPACE] [W] [G] jump (also start from title)
+        [,] [/]         walk left / right
+        [;]             jump
+        [SPACE]         attack hop
+        [.]             sit (wolf may walk past)
         [`]             exit to IDLE
 
-    trees grow in the real scene, drop fruit, fruit sits on the turf.
-    walk under or jump to collect. sparks + tail wiggle on pickup.
-    seasons and weather still apply (snow, rain, leaves).
+    trees drop seasonal produce. walk under or jump to collect.
+    HUD bars: fruit / lives / wolf % — no wifi junk.
+
+
+----[ 8.3c - 1RP0RK (IR power blast)
+
+    point the Cardputer IR LED (edge of the case) at a TV you own.
+
+        [SPACE]         fire power pack
+        [R]             N4 / 3U region
+        [E] / [I]       pick custom file from SD /ir/
+        [B]             back to builtin P0W3R pack
+        [X]             stop blast
+        [`]             exit
+
+    during fire: big menu hidden — pig + thin progress bar only.
+    piezo muted while IR TX (no glitch choir).
+
+
+----[ 8.3d - RANK / FL3X3S (RPG hub)
+
+    [S] opens FL3X3S directly (LVL, XP, lifetime ST4TS, B00STS, W1GL3).
+    MENU → RANK also lists:
+        FL3X3S   D3M4NDS   B4DG3S   UNL0CK   FRU1TRUN
+    D3M4NDS = same as hotkey [1] (session challenges / XP trials).
 
 
 ----[ 8.4 - MODE-SPECIFIC
@@ -1331,8 +1357,8 @@
     upstream official:
         github.com/0ct0sec/M5PORKCHOP/releases
 
-    One Pork fan binary (this tree, v0.1.8c (1.3)):
-        releases/OnePork_v0.1.8c-1.3_m5cardputer_firmware.bin
+    One Pork fan binary (this tree, v0.1.8c (1.4)):
+        releases/OnePork_v0.1.8c-1.4_m5cardputer_firmware.bin
         (on GitHub: repo → releases/ folder or Releases page if published)
 
     1. download firmware.bin
@@ -1663,11 +1689,11 @@
 
 ------------------------------------------------------------------------
 
---[ 15 - ONE PORK v0.1.8c (1.3) (FAN PACKAGING)
+--[ 15 - ONE PORK v0.1.8c (1.4) (FAN PACKAGING)
 
-    VERSION: **v0.1.8c (1.3)**
+    VERSION: **v0.1.8c (1.4)**
         - 0.1.8c  = last known upstream M5PORKCHOP line this tree is based on
-        - (1.3)   = One Pork fan package revision (next fan drop = 1.4, then 1.5…)
+        - (1.4)   = One Pork fan package revision
 
     this folder may be published as **One Pork** — a fan / community
     packaging of M5PORKCHOP. it is NOT a rewrite of authorship.
@@ -1686,21 +1712,50 @@
     full fan changelog + tree map: **FAN.md**
 
 
-----[ 15.2 - WHAT THIS FAN PASS ADDED (SHORT)
+----[ 15.2 - WHAT 1.4 ADDED / FIXED (SHORT)
 
-    - trees + falling produce module (seasonal fruit, world scroll, FG drops)
-    - wolf visitor (bite → play-dead 10s; sit → pass by; attack scares wolf)
-    - IDLE free-roam polish; scene suspend on heavy ops (PigPass / TLS / …)
-    - Hashes/Tracks scan deferred fix (soft heap gate)
-    - packaging cleanup (no host unit-test tree on device builds)
+    NEW:
+    - [I] 1RP0RK    — IR power blast (N4/EU packs), custom SD /ir/*.txt
+    - [G] FRUITRUN  — orchard mini-game (lives, wolf pressure)
+    - RANK hub      — FLEXES / DEMANDS / BADGES / UNLOCK / FRUITRUN
+    - FLEXES GR1ND  — “do this = +XP = pig LVL up” cheat sheet tab
+    - seasons       — cherry / apple / old apple / fir + world FX
+    - boot / ABOUT  — 0N3 P0RK branding + v0.1.8c (1.4) stamp
+
+    FIXED:
+    - [B] BLUES cold start reboot/black screen
+          (free NetworkRecon table before NimBLE; OINK-handoff class fix)
+    - IR TX mutes piezo during blast
+    - monologue timing: 5s show, 15s silence
+
+    SCENE (carried):
+    - trees + drops, wolf visitor, seasonal FX, free-roam IDLE polish
+
+    PACKAGING:
+    - FAN.md changelog; prebuilt bin under releases/
+    - donate 0ct0 first
 
     everything RF/core that already oinked: still 0ct0's foundation.
 
 
-----[ 15.3 - UPSTREAM
+----[ 15.3 - RANK / RPG MAP (where the cheese lives)
+
+    MENU → RANK:
+        FLEXES   [S]   LVL, XP bar, ST4TS / B00ST / GR1ND / W1GL3
+        DEMANDS  [1]   session challenges — XP rewards
+        BADGES         achievements / pr00f
+        UNLOCK         secret unlockables
+        FRUITRUN [G]   orchard mini-game (XP on fruit)
+
+    the pig is still an RPG. street cred is still cheese.
+    the numbers still lie less than your neighbors.
+
+
+----[ 15.4 - UPSTREAM
 
     https://github.com/0ct0sec/M5PORKCHOP
     https://buymeacoffee.com/0ct0
+    fan: https://github.com/lexilexiko/OnePork
 
     praise the sun. oink forever. the horse is still the barn.
 

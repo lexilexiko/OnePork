@@ -31,7 +31,8 @@ static const char* MOOD_NVS_NAMESPACE = "porkmood";
 char Mood::currentPhrase[40] = "oink";
 int Mood::happiness = 50;
 uint32_t Mood::lastPhraseChange = 0;
-uint32_t Mood::phraseInterval = 5000;
+// Full cycle = show + silence (used by ambient selectPhrase)
+uint32_t Mood::phraseInterval = 20000;  // 5s visible + 15s quiet
 uint32_t Mood::lastActivityTime = 0;
 static char lastStatusMessage[40] = "";
 static uint32_t lastStatusMessageTime = 0;
@@ -1461,7 +1462,7 @@ const char* PHRASES_RARE[] = {
 void Mood::init() {
     SET_PHRASE(currentPhrase, "oink");
     lastPhraseChange = millis();
-    phraseInterval = 5000;
+    phraseInterval = 20000;  // 5s show + 15s silence before next ambient line
     lastActivityTime = millis();
 
     // Reset momentum system
@@ -1674,24 +1675,27 @@ void Mood::update() {
         onNoActivity(inactiveSeconds);
     }
 
-    // Natural happiness decay
-    if (now - lastPhraseChange > phraseInterval) {
+    // Ambient monologue cycle:
+    //   0..5s   bubble visible
+    //   5s..20s bubble gone (silence)
+    //   20s     pick next phrase
+    // phraseInterval = SHOW + SILENT (default 5s + 15s)
+    static constexpr uint32_t PHRASE_SHOW_MS = 5000;
+    const uint32_t silentMs = (phraseInterval > PHRASE_SHOW_MS)
+                                  ? (phraseInterval - PHRASE_SHOW_MS) : 15000;
+    const uint32_t cycleMs = PHRASE_SHOW_MS + silentMs;
+
+    if (!dialogueLocked && phraseQueueCount == 0 &&
+        (now - lastPhraseChange > cycleMs)) {
         happiness = constrain(happiness - 1, -100, 100);
-        
-        // Skip automatic phrase selection if dialogue is locked (BLE sync in progress)
-        // This prevents mood phrases from overwriting Papa/Son dialogue
-        if (!dialogueLocked) {
-            selectPhrase();
-        }
+        selectPhrase();
         lastPhraseChange = now;
-        
-        // Random cute jump in IDLE mode when happy (0.5% chance per phrase cycle)
-        // Makes the pig feel alive - spontaneous little hops
-        // Skip when ANIM TEST is on so demos stay clean
+
+        // Rare cute jump in IDLE when happy (0.5% per monologue cycle)
         if (porkchop.getMode() == PorkchopMode::IDLE &&
             !Config::personality().animTest &&
             getEffectiveHappiness() > 20) {
-            if (random(0, 200) == 0) {  // 0.5% chance
+            if (random(0, 200) == 0) {
                 Avatar::cuteJump();
             }
         }
@@ -2903,6 +2907,17 @@ void Mood::draw(M5Canvas& canvas) {
     if (Avatar::isTransitioning()) {
         return;  // Pig is walking, no speech bubble
     }
+
+    // Monologue window: show ~5s, then hide until next cycle (15s silence)
+    // Event phrases also use lastPhraseChange — same 5s visibility.
+    static constexpr uint32_t PHRASE_SHOW_MS = 5000;
+    if ((millis() - lastPhraseChange) >= PHRASE_SHOW_MS) {
+        return;  // quiet stretch — no bubble on screen
+    }
+
+    // Empty / whitespace-only: nothing to draw
+    const char* ph = getCurrentPhrase();
+    if (!ph || !ph[0]) return;
     
     // Calculate bubble size based on ACTUAL word-wrapped content
     // Dynamic width: fits content tightly, min 50px, max 116px

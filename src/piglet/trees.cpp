@@ -68,18 +68,17 @@ static constexpr uint16_t C_FIR    = 0x0B40;
 static constexpr uint16_t C_FIR2   = 0x1C80;
 static constexpr uint16_t C_FIR3   = 0x0540;
 static constexpr uint16_t C_ORNAM  = 0xF800;  // red ornament
-// Spring birch
-static constexpr uint16_t C_BIRCH  = 0xEF5D;  // paper white bark
-static constexpr uint16_t C_BIRCH2 = 0xC618;  // bark mid
-static constexpr uint16_t C_BIRCH_M= 0x3186;  // black marks
-// Birch catkins (spring)
-static constexpr uint16_t C_BIRCH_CAT  = 0xC840;  // pale brown-green catkin
-static constexpr uint16_t C_BIRCH_CAT2 = 0x8C40;  // darker catkin shade
-static constexpr uint16_t C_BIRCH_CAT_H= 0xE6A0;  // highlight
-static constexpr uint16_t C_SPRING = 0x3D08;  // fresh leaf
+// Spring cherry (sakura) — dark trunk + pink blossom canopy
+static constexpr uint16_t C_CHERRY_TRUNK  = 0x5A20;  // warm brown bark
+static constexpr uint16_t C_CHERRY_TRUNK2 = 0x3900;  // dark shade
+static constexpr uint16_t C_CHERRY_TRUNK_H= 0x8C40;  // lit edge
+static constexpr uint16_t C_BLOSSOM1 = 0xC816;  // deep rose (volume)
+static constexpr uint16_t C_BLOSSOM2 = 0xFB56;  // mid pink
+static constexpr uint16_t C_BLOSSOM3 = 0xFEDB;  // pale blossom tip
+static constexpr uint16_t C_SPRING = 0x3D08;  // fresh leaf (bush / accents)
 static constexpr uint16_t C_SPRING2= 0x6E8A;
 static constexpr uint16_t C_SPRING3= 0xAFE5;
-// Autumn oak leaves
+// Autumn old apple tree — warm fall canopy
 static constexpr uint16_t C_OAK1   = 0xD300;  // orange
 static constexpr uint16_t C_OAK2   = 0xE4E0;  // yellow
 static constexpr uint16_t C_OAK3   = 0x9A20;  // brown-red
@@ -90,12 +89,12 @@ static constexpr uint16_t C_DECOR_LEAF = 0x1C40;
 enum class Phase : uint8_t { HIDDEN = 0, GROWING, ALIVE, COLLAPSING };
 
 // Season look for FRUIT + DECOR (main scenery trees)
-// SPRING=birch  SUMMER=green apple  AUTUMN=oak  WINTER=fir
+// SPRING=cherry  SUMMER=apple  AUTUMN=old apple  WINTER=fir
 enum class SeasonTree : uint8_t {
-    BIRCH = 0,
-    APPLE = 1,
-    OAK   = 2,
-    FIR   = 3
+    CHERRY    = 0,
+    APPLE     = 1,
+    OLD_APPLE = 2,  // autumn "old apple tree" (was oak)
+    FIR       = 3
 };
 
 struct Branch { int16_t x1, y1, x2, y2; uint8_t thickness; };
@@ -142,9 +141,9 @@ static uint32_t waveShakeStart = 0;
 
 static SeasonTree styleFromSeason(Season s) {
     switch (s) {
-        case Season::SPRING: return SeasonTree::BIRCH;
+        case Season::SPRING: return SeasonTree::CHERRY;
         case Season::SUMMER: return SeasonTree::APPLE;
-        case Season::AUTUMN: return SeasonTree::OAK;
+        case Season::AUTUMN: return SeasonTree::OLD_APPLE;
         case Season::WINTER: return SeasonTree::FIR;
         default: return SeasonTree::APPLE;
     }
@@ -160,9 +159,10 @@ static bool globalStompArmed = true;
 static Produce produceForSlot(const Slot& t) {
     // Bush always berries (all seasons)
     if (t.kind == Kind::BERRY) return Produce::BERRY;
-    // Autumn oak tree: soft green apples (harmonize with canopy, not neon)
-    if (t.style == SeasonTree::OAK) return Produce::GREEN_APPLE;
-    if (t.style == SeasonTree::BIRCH) return Produce::BIRCH_CATKIN;
+    // Autumn old apple tree: soft green apples
+    if (t.style == SeasonTree::OLD_APPLE) return Produce::GREEN_APPLE;
+    // Spring cherry: paired red cherries on pink blossoms
+    if (t.style == SeasonTree::CHERRY) return Produce::CHERRY;
     if (t.style == SeasonTree::FIR) return Produce::CONE;
     return Produce::RED_APPLE;
 }
@@ -193,7 +193,7 @@ static Slot& berrySlot() { return slots[(int)Kind::BERRY]; }
 
 // ---------- generate: full L/R canopy (never one-sided) + leaves + produce ----------
 // scalePct: 100 = fruit/decor, ~70 = berry bush (taller than before, still smaller)
-// FRUIT/DECOR pick season style: birch / green apple / oak / fir
+// FRUIT/DECOR pick season style: cherry / apple / old apple / fir
 static void genClassicTree(Slot& t, uint8_t fruitCount, uint8_t scalePct) {
     t.seed = esp_random();
     t.scroll = 0;
@@ -227,14 +227,14 @@ static void genClassicTree(Slot& t, uint8_t fruitCount, uint8_t scalePct) {
     uint8_t fullH = 66 + fruitCount + (uint8_t)(lcg(s) % 7);
     if (t.kind == Kind::BERRY) fullH = 40 + (uint8_t)(lcg(s) % 10);
     else if (t.style == SeasonTree::FIR) fullH = 70 + (uint8_t)(lcg(s) % 10);   // tall fir
-    else if (t.style == SeasonTree::OAK) fullH = 58 + (uint8_t)(lcg(s) % 8);    // stout oak
-    else if (t.style == SeasonTree::BIRCH) fullH = 62 + (uint8_t)(lcg(s) % 10); // slender birch
+    else if (t.style == SeasonTree::OLD_APPLE) fullH = 58 + (uint8_t)(lcg(s) % 8); // stout old apple
+    else if (t.style == SeasonTree::CHERRY) fullH = 60 + (uint8_t)(lcg(s) % 10); // elegant cherry
     t.trunkH = (uint8_t)((int)fullH * (int)scalePct / 100);
     if (t.kind == Kind::BERRY && t.trunkH < 28) t.trunkH = 28;
     if (t.trunkH < 14) t.trunkH = 14;
     t.trunkW = 2 + (uint8_t)(lcg(s) % 2);
-    if (t.style == SeasonTree::OAK) t.trunkW = 3;           // thick oak
-    if (t.style == SeasonTree::BIRCH) t.trunkW = 1;         // thin birch
+    if (t.style == SeasonTree::OLD_APPLE) t.trunkW = 3;     // thick gnarled trunk
+    if (t.style == SeasonTree::CHERRY) t.trunkW = 2;        // medium cherry trunk
     if (t.style == SeasonTree::FIR) t.trunkW = 1;
     if (t.kind == Kind::BERRY && t.trunkW > 2) t.trunkW = 2;
     t.lean = (int8_t)(lcg(s) % 7) - 3;
@@ -375,23 +375,24 @@ static void genClassicTree(Slot& t, uint8_t fruitCount, uint8_t scalePct) {
         }
     }
 
-    // Produce: berry bush always; FRUIT by season (apple/acorn/birch catkins)
+    // Produce: berry bush always; FRUIT by season (apple / cherry / green apple)
     bool withProduce = false;
     if (t.kind == Kind::BERRY) withProduce = true;
     else if (t.kind == Kind::FRUIT) {
-        withProduce = (t.style == SeasonTree::APPLE || t.style == SeasonTree::OAK || t.style == SeasonTree::BIRCH);
+        withProduce = (t.style == SeasonTree::APPLE || t.style == SeasonTree::OLD_APPLE ||
+                       t.style == SeasonTree::CHERRY);
     }
     if (withProduce) {
         uint8_t want = fruitCount;
         if (t.kind == Kind::BERRY) {
             want = 5 + (uint8_t)(lcg(s) % 4);  // berries always
             if (want > MAX_FRUITS) want = MAX_FRUITS;
-        } else if (t.style == SeasonTree::OAK) {
+        } else if (t.style == SeasonTree::OLD_APPLE) {
             want = 4 + (uint8_t)(lcg(s) % 4);  // soft green apples
             if (want > MAX_FRUITS) want = MAX_FRUITS;
-        } else if (t.style == SeasonTree::BIRCH) {
-            // birch catkins: a few small clusters
-            want = 3 + (uint8_t)(lcg(s) % 5);  // 3..7
+        } else if (t.style == SeasonTree::CHERRY) {
+            // cherries hang in pairs across the blossom canopy
+            want = 5 + (uint8_t)(lcg(s) % 4);  // 5..8
             if (want > MAX_FRUITS) want = MAX_FRUITS;
         } else if (want > MAX_FRUITS) {
             want = MAX_FRUITS;
@@ -402,15 +403,17 @@ static void genClassicTree(Slot& t, uint8_t fruitCount, uint8_t scalePct) {
         uint8_t rBase = 2, rJitter = 2;
         if (t.kind == Kind::BERRY) { rBase = 2; rJitter = 2; }
         else if (t.style == SeasonTree::FIR) { rBase = 2; rJitter = 2; }
-        else if (t.style == SeasonTree::OAK) { rBase = 2; rJitter = 2; }  // compact green apples
-        else if (t.style == SeasonTree::BIRCH) { rBase = 2; rJitter = 3; }
+        else if (t.style == SeasonTree::OLD_APPLE) { rBase = 2; rJitter = 2; }  // compact green apples
+        else if (t.style == SeasonTree::CHERRY) { rBase = 2; rJitter = 2; } // paired cherries
         else if (t.style == SeasonTree::APPLE) { rBase = 2; rJitter = 2; } // 2..3 compact
         uint8_t endpointCount = t.branchCount > 0 ? t.branchCount : 1;
         for (uint8_t i = 0; i < t.fruitCount; i++) {
             const Branch& br = t.branches[lcg(s) % endpointCount];
-            int16_t scatter = (t.kind == Kind::BERRY || t.style == SeasonTree::OAK) ? 2 : 3;
+            int16_t scatter = (t.kind == Kind::BERRY || t.style == SeasonTree::OLD_APPLE) ? 2 : 3;
             t.fruits[i].ox = br.x2 + (int16_t)((lcg(s) % (scatter * 2 + 1)) - scatter);
-            t.fruits[i].oy = br.y2 + (int16_t)((lcg(s) % (scatter * 2 + 1)) - scatter);
+            // Cherries hang slightly below blossom tips
+            int16_t yOff = (t.style == SeasonTree::CHERRY) ? 3 : 0;
+            t.fruits[i].oy = br.y2 + yOff + (int16_t)((lcg(s) % (scatter * 2 + 1)) - scatter);
             uint8_t rr = rBase + (uint8_t)(lcg(s) % rJitter);
             if (rr < 2) rr = 2;
             if (t.style == SeasonTree::APPLE && rr > 3) rr = 3;
@@ -948,11 +951,11 @@ static void drawTreeSlot(M5Canvas& canvas, Slot& t, int16_t yOffset) {
 
     // Trunk palette by species
     uint16_t trunkCol, trunkDark, trunkHi;
-    if (!isBerry && t.style == SeasonTree::BIRCH) {
-        trunkCol  = fl(C_BIRCH);
-        trunkDark = fl(C_BIRCH2);
-        trunkHi   = fl(0xFFFF);
-    } else if (!isBerry && t.style == SeasonTree::OAK) {
+    if (!isBerry && t.style == SeasonTree::CHERRY) {
+        trunkCol  = fl(C_CHERRY_TRUNK);
+        trunkDark = fl(C_CHERRY_TRUNK2);
+        trunkHi   = fl(C_CHERRY_TRUNK_H);
+    } else if (!isBerry && t.style == SeasonTree::OLD_APPLE) {
         trunkCol  = fl(0x6A00);
         trunkDark = fl(0x4100);
         trunkHi   = fl(0x9B20);
@@ -990,11 +993,12 @@ static void drawTreeSlot(M5Canvas& canvas, Slot& t, int16_t yOffset) {
             leafLite = fl(0x1C60);   // body green
             leafHi   = fl(0x45A0);   // sunlit
         }
-    } else if (t.style == SeasonTree::BIRCH) {
-        leafCol  = fl(0x1C20);      // darker spring shadow
-        leafLite = fl(C_SPRING);
-        leafHi   = fl(C_SPRING3);
-    } else if (t.style == SeasonTree::OAK) {
+    } else if (t.style == SeasonTree::CHERRY) {
+        // Pink blossom canopy — spring sakura look (unique from green summer)
+        leafCol  = fl(C_BLOSSOM1);  // deep rose
+        leafLite = fl(C_BLOSSOM2);  // mid pink
+        leafHi   = fl(C_BLOSSOM3);  // pale tips
+    } else if (t.style == SeasonTree::OLD_APPLE) {
         leafCol  = fl(C_OAK3);      // brown-red dark
         leafLite = fl(C_OAK1);      // orange
         leafHi   = fl(C_OAK2);      // yellow
@@ -1069,11 +1073,9 @@ static void drawTreeSlot(M5Canvas& canvas, Slot& t, int16_t yOffset) {
                     else if (dx == hw) tc = trunkDark;
                     canvas.fillRect(cx + dx * PX, trunkTop + row, PX, h, tc);
                 }
-                // Birch black dashes
-                if (!isBerry && t.style == SeasonTree::BIRCH && (row % (PX * 3) == 0)) {
-                    canvas.fillRect(cx + hw * PX, trunkTop + row, PX, PX, fl(C_BIRCH_M));
-                    if ((row / PX) & 1)
-                        canvas.fillRect(cx - hw * PX, trunkTop + row, PX, PX, fl(C_BIRCH_M));
+                // Cherry: soft bark rings (not birch dashes)
+                if (!isBerry && t.style == SeasonTree::CHERRY && (row % (PX * 4) == 0)) {
+                    canvas.fillRect(cx - hw * PX, trunkTop + row, PX, 1, fl(C_CHERRY_TRUNK2));
                 }
             }
         }
@@ -1098,9 +1100,9 @@ static void drawTreeSlot(M5Canvas& canvas, Slot& t, int16_t yOffset) {
             }
             int16_t ex = sx + (int16_t)((fex - sx) * bp);
             int16_t ey = sy + (int16_t)((fey - sy) * bp);
-            // Birch: thinner dark twigs; oak: thicker brown
+            // Cherry twigs slightly darker brown; oak keeps trunk tone
             uint16_t brCol = trunkCol;
-            if (t.style == SeasonTree::BIRCH) brCol = fl(C_BIRCH2);
+            if (t.style == SeasonTree::CHERRY) brCol = fl(C_CHERRY_TRUNK2);
             fatLine(canvas, sx, sy, ex, ey, brCol);
             if (bp > 0.85f) {
                 drawLeafPuff(canvas, ex, ey, leafCol, leafLite, leafHi, 4, i % 3);
@@ -1121,10 +1123,18 @@ static void drawTreeSlot(M5Canvas& canvas, Slot& t, int16_t yOffset) {
                     ly += (int16_t)(collapseT2 * dg);
                     if (ly > baseY) continue;
                 }
-                // Oak: larger puffs
+                // Oak / cherry: fuller puffs so canopy reads
                 uint8_t rr = L.radius;
-                if (t.style == SeasonTree::OAK && rr < 6) rr = 6;
-                drawLeafPuff(canvas, lx, ly, leafCol, leafLite, leafHi, rr, L.shade);
+                if (t.style == SeasonTree::OLD_APPLE && rr < 6) rr = 6;
+                if (t.style == SeasonTree::CHERRY && rr < 5) rr = 5;
+                // Mix a few soft-green leaf accents under pink blossoms
+                uint16_t lc = leafCol, ll = leafLite, lh = leafHi;
+                if (t.style == SeasonTree::CHERRY && (L.shade == 2) && (i & 3) == 0) {
+                    lc = fl(0x1C40);
+                    ll = fl(C_SPRING);
+                    lh = fl(C_SPRING3);
+                }
+                drawLeafPuff(canvas, lx, ly, lc, ll, lh, rr, L.shade);
                 // Winter snow blobs on foliage (all non-fir trees + bush)
                 if (winter && t.phase == Phase::ALIVE && (L.shade == 0 || (i & 1))) {
                     canvas.fillRect(snapPx(lx) - PX, snapPx(ly) - 2 * PX, PX * 2, PX, fl(0xFFFF));

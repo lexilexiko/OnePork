@@ -1,4 +1,4 @@
-// Falling produce (apples / acorns / catkins / cones / berries).
+// Falling produce (apples / cherries / acorns / cones / berries).
 // Separate from tree geometry so ground fruit can scroll with the world
 // and draw in the foreground above grass.
 #pragma once
@@ -13,8 +13,8 @@ enum class Produce : uint8_t {
     BERRY = 0,
     RED_APPLE,
     YELLOW_APPLE,
-    GREEN_APPLE,   // autumn bush — summer-shaped apple, green
-    BIRCH_CATKIN,
+    GREEN_APPLE,   // autumn old apple tree — soft green apples
+    CHERRY,        // spring cherry tree — paired red cherries
     ACORN,
     CONE
 };

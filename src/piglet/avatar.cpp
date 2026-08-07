@@ -8,6 +8,7 @@
 #include "../ui/display.h"
 #include "../core/config.h"
 #include "../audio/sfx.h"
+#include "../modes/fruit_run.h"
 #include <time.h>
 #include <math.h>
 
@@ -1616,11 +1617,9 @@ void Avatar::drawFrame(M5Canvas& canvas, bool blink, bool faceRight, bool sniff)
         bool airborne = attackHopActive || (jumpActive && getJumpLiftPx() > 3);
         if (airborne) {
             int feetX = currentX + 14 * (int)PX;
-            int wx = Wolf::getX();
-            int dist = feetX - wx;
-            if (dist < 0) dist = -dist;
-            if (dist < 42) {
-                Wolf::scareAway();  // plays WOLF_HIT
+            uint8_t before = Wolf::getActiveCount();
+            Wolf::scareNear(feetX, 42);  // 1–2 wolves
+            if (Wolf::getActiveCount() < before) {
                 triggerSparkles(5);
                 triggerTailWiggle();
                 setState(AvatarState::HAPPY);
@@ -2704,8 +2703,10 @@ void Avatar::setPlayDead(bool on) {
 bool Avatar::isPlayDead() { return s_playDead; }
 
 void Avatar::onWolfBitten() {
-    // Play-dead + 10s lock on all free-roam controls
-    s_controlLockUntil = millis() + kWolfBiteLockMs;
+    // Play-dead + control lock. Shorter in Fruit Run (lives handle death).
+    uint32_t lockMs = kWolfBiteLockMs;
+    if (FruitRunMode::isRunning()) lockMs = 1800;  // brief stun, not 10s
+    s_controlLockUntil = millis() + lockMs;
     attackHopActive = false;
     jumpActive = false;
     setPlayerWalkScroll(false, facingRight);

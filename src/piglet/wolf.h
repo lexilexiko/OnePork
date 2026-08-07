@@ -1,6 +1,5 @@
 // Wolf visitor — separate scene actor (not weather / not seasonal FX).
-// Sometimes enters from off-screen, chases the pig, then leaves.
-// Keep all wolf logic HERE so avatar/weather stay clean.
+// Ambient: 1 wolf auto-spawns. Fruit Run can disable auto and spawn 1–2 wolves.
 //
 // Call Wolf::update() with SeasonalFx; draw AFTER Avatar (on top of pig/grass).
 #pragma once
@@ -14,16 +13,30 @@ void update();
 void draw(M5Canvas& canvas);
 void reset();
 
-// Force a visit (ANIM TEST / debug later)
+// Force a visit (ANIM TEST / fruit-run spawns)
 void spawnNow();
+// Spawn a second wolf if slot free (hard mode)
+bool spawnSecond();
 
-// Pig jumped on / attacked wolf — flee off screen
+// Pig jumped on / attacked wolf — nearest active flees
 void scareAway();
+// Scare any wolf near screen X (for multi-wolf stomp)
+void scareNear(int feetX, int radius = 36);
+
+// Ambient auto-spawn on/off (Fruit Run turns off and spawns itself)
+void setAutoSpawn(bool enabled);
+bool getAutoSpawn();
+// How many wolves may be on screen at once (1 ambient, 2 hard mode)
+void setMaxActive(uint8_t n);
 
 bool isActive();
-// Feet X of wolf body center (for debug / future collisions)
+// Count of wolves currently on screen
+uint8_t getActiveCount();
+// Feet X of first active wolf (compat)
 int16_t getX();
-// Feet Y (ground line ~106)
 int16_t getY();
+
+// Fruit Run: true once per bite event (clears flag)
+bool consumeBiteEvent();
 
 }  // namespace Wolf

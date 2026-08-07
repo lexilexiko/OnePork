@@ -241,34 +241,55 @@ void MicPorkMode::update() {
         micOk = false;
     }
 
-    // Pig IS the spectrometer
-    Avatar::setMicDance(overallLevel);
+    // Quiet room = calm pig (no constant tremble). Dance/waves only on real sound.
+    static constexpr float HEAR_THR = 0.16f;   // clear speech / clap
+    static constexpr float DANCE_THR = 0.20f;  // pig bounces
+    static constexpr float WAVE_THR  = 0.28f;  // bang → ring
+    static constexpr float JUMP_THR  = 0.55f;  // hard peak hop
+
+    static float prevLevel = 0.0f;
+    uint32_t now = millis();
+
+    if (overallLevel >= DANCE_THR) {
+        Avatar::setMicDance(overallLevel);
+    } else {
+        Avatar::setMicDance(0.0f);  // stop shaking when quiet
+    }
 
     if (overallLevel > 0.45f) {
         Avatar::setState(AvatarState::EXCITED);
-    } else if (overallLevel > 0.12f) {
+    } else if (overallLevel >= HEAR_THR) {
         Avatar::setState(AvatarState::HAPPY);
     } else {
         Avatar::setState(AvatarState::NEUTRAL);
     }
 
-    // Jump on strong peaks
+    // Jump only on loud peaks
     static uint32_t lastJump = 0;
-    uint32_t now = millis();
-    if (overallLevel > 0.50f && (now - lastJump) > 280) {
+    if (overallLevel > JUMP_THR && (now - lastJump) > 400) {
         Avatar::cuteJump();
         lastJump = now;
     }
 
-    // Rings only when actually hearing (not noise floor)
-    if (overallLevel > 0.08f) {
+    // Waves only on sudden bangs (rising edge), not continuous hum
+    float rise = overallLevel - prevLevel;
+    if (overallLevel >= WAVE_THR && rise > 0.10f && (now - lastWaveMs) > 220) {
         uint8_t intensity = 2 + (uint8_t)(overallLevel * 3.5f);
         if (intensity > 5) intensity = 5;
-        if ((now - lastWaveMs) > 100) {
-            Avatar::waveRipple(WaveMode::OUTGOING, intensity);
-            lastWaveMs = now;
-        }
+        Avatar::waveRipple(WaveMode::OUTGOING, intensity);
+        lastWaveMs = now;
     }
+    // If still loud, occasional soft ring (not every frame)
+    else if (overallLevel >= 0.40f && (now - lastWaveMs) > 450) {
+        Avatar::waveRipple(WaveMode::OUTGOING, 2 + (uint8_t)(overallLevel * 2.0f));
+        lastWaveMs = now;
+    }
+    // Silence → kill lingering rings quickly
+    else if (overallLevel < HEAR_THR && (now - lastWaveMs) > 600) {
+        Avatar::waveRipple(WaveMode::NONE);
+    }
+
+    prevLevel = overallLevel;
 }
 
 void MicPorkMode::draw(M5Canvas& canvas) {
@@ -280,19 +301,14 @@ void MicPorkMode::draw(M5Canvas& canvas) {
     Weather::draw(canvas, COLOR_FG, COLOR_BG);
     SeasonalFx::draw(canvas);
 
+    // Minimal on-scene cue (main stats on bars)
     canvas.setTextSize(1);
     canvas.setTextDatum(top_left);
     if (!micOk) {
         canvas.setTextColor(UiStyle::RED);
         canvas.drawString("MIC ERR", 4, 2);
-    } else {
-        canvas.setTextColor(overallLevel > 0.08f ? UiStyle::GREEN : UiStyle::RED);
-        canvas.drawString(overallLevel > 0.08f ? "HEAR" : "MIC", 4, 2);
-        // Tiny level tick (debug aid, not a spectrum UI)
-        int lw = (int)(overallLevel * 36.0f);
-        canvas.fillRect(30, 3, 40, 6, UiStyle::PANEL);
-        if (lw > 0) canvas.fillRect(31, 4, lw, 4, UiStyle::GREEN);
+    } else if (overallLevel >= 0.16f) {
+        canvas.setTextColor(UiStyle::GREEN);
+        canvas.drawString("HEAR!", 4, 2);
     }
-    canvas.setTextColor(UiStyle::DIM);
-    canvas.drawString("M=STOP", DISPLAY_W - 48, 2);
 }

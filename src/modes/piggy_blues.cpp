@@ -511,26 +511,55 @@ void PiggyBluesMode::start() {
     Mood::resetBLESniffState();  // Reset first-target sniff for new session
     Display::clearBottomOverlay();
     Display::notify(NoticeKind::STATUS, "BLUES ON", 1200, NoticeChannel::TOP_BAR);
-    
-    // Stop NetworkRecon before disabling WiFi (BLE needs exclusive radio)
+
+    // ------------------------------------------------------------------
+    // Why OINK-first "fixed" B: handshake mode fully exercises WiFi STA +
+    // promiscuous (NetworkRecon), then leaves a clean handoff. Cold B after
+    // boot kept recon's ~19KB network table + promisc hooks while NimBLE
+    // tried to start → hard reset / black screen. Same idea as XFER and the
+    // "OINK bounce" heap brew — free recon memory, keep WiFi driver, then BLE.
+    // ------------------------------------------------------------------
+    if (!NetworkRecon::isRunning() && !NetworkRecon::isPaused()) {
+        // Belt-and-suspenders: WiFi driver must exist once (boot usually did this)
+        WiFi.persistent(false);
+        WiFi.setSleep(false);
+        WiFi.mode(WIFI_STA);
+        delay(50);
+        yield();
+    }
+
+    // Exclusive radio for BLE: stop promisc AND free networks vector (~19KB)
+    // so NimBLE can allocate. stop() alone left the table reserved.
     NetworkRecon::stop();
+    NetworkRecon::freeNetworks();
+    delay(50);
+    yield();
     
-    // Stop WiFi radio but keep driver initialized (shared antenna for BLE)
-    // WiFi.mode(WIFI_OFF) calls esp_wifi_deinit() which causes RX buffer allocation
-    // failures on restart — use esp_wifi_stop() to keep buffers allocated
+    // Keep WiFi *driver* initialized (shared antenna). WIFI_OFF → deinit
+    // breaks RX buffers on later NetworkRecon::start().
+    WiFi.mode(WIFI_STA);
     WiFi.disconnect(true);
     delay(BLE_OP_DELAY_MS);
+    yield();
     
     // Initialize NimBLE only if not already initialized
     if (!NimBLEDevice::isInitialized()) {
         NimBLEDevice::init("");
+        delay(20);
+        yield();
+    }
+    if (!NimBLEDevice::isInitialized()) {
+        Display::notify(NoticeKind::WARNING, "BLE INIT FAIL", 2500, NoticeChannel::TOP_BAR);
+        NetworkRecon::start();  // restore recon after failed handoff
+        return;
     }
     NimBLEDevice::setPower(ESP_PWR_LVL_P9);  // Max power for range
     NimBLEDevice::setOwnAddrType(BLE_OWN_ADDR_RANDOM);  // Use random address
     
     pAdvertising = NimBLEDevice::getAdvertising();
     if (!pAdvertising) {
-        WiFi.mode(WIFI_STA);  // Re-enable WiFi on failure
+        Display::notify(NoticeKind::WARNING, "BLE ADV FAIL", 2500, NoticeChannel::TOP_BAR);
+        NetworkRecon::start();
         return;
     }
     pAdvertising->setMinInterval(BLE_ADV_MIN_INTERVAL);  // 20ms

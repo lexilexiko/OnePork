@@ -57,6 +57,11 @@ static const char* const H_EVILPIG[] = {
     "LAB ONLY. SoftAP + captive + optional kick.",
     "Catches on SD: /m5porkchop/evilpig/"
 };
+static const char* const H_IRPORK[] = {
+    "I H0TK3Y. P01NT SN0UT 1R 4T TH3 B0X.",
+    "P0W3R BL4ST. N4/3U P4CKS. CUST0M /ir.",
+    "SPC F1R3. R = R3G10N. E = L04D C0D3S."
+};
 static const char* const H_BLUES[] = {
     "BLEZZ YOUR NEIGHBORS. CURSE YOUR HEAP.",
     "BECAUSE SILENCE IS FOR WELL-ADJUSTED.",
@@ -83,9 +88,9 @@ static const char* const H_MICPORK[] = {
     "SPECTRUM OF SQUEALS. HIT IT."
 };
 static const char* const H_FRUITRUN[] = {
-    "JUMP. CATCH FRUIT. OINK OVER.",
-    "CHROME DINO BUT WITH BACON.",
-    "G KEY. ORCHARD CHAOS."
+    "JUMP. C4TCH FRU1T. 1000 G0AL. 3 L1V3S.",
+    "W0LF B1T3S. G KEY. 0RCH4RD CH40S.",
+    "3XP 0N P1CKUP. H4RD M0D3 4T 1000."
 };
 static const char* const H_HASHES[] = {
     "FEED YO HASHCAT.",
@@ -118,19 +123,24 @@ static const char* const H_XFIL[] = {
     "HEAP DIED. PRAISE THE SUN."
 };
 static const char* const H_FLEX[] = {
-    "SHOW YOUR GRIND. HIDE THE PAIN.",
-    "LOOK MA, NO STABILITY.",
-    "DEBUG LEVEL: REGRET."
+    "S H0TK3Y. LVL / XP / T13R / ST4TS.",
+    "SH0W Y0UR GR1ND. H1D3 TH3 P41N.",
+    "D3BUG L3V3L: R3GR3T. 3XP D035NT L13."
 };
 static const char* const H_BADGES[] = {
-    "MISCHIEF MERIT. LEGALLY DISTINCT.",
-    "ACHIEVEMENTS UNLOCKED.",
-    "PERFORMANCE MODE: DENIAL."
+    "M1SCH13F M3R1T. L3G4LLY D1ST1NCT.",
+    "4CH13V3M3NTS UNL0CK3D. FL3X H4RD.",
+    "P3RF0RM4NC3 M0D3: D3N14L."
 };
 static const char* const H_SNOUTS[] = {
-    "MOUNT YOUR TROPHIES. NO SNITCHES.",
-    "COLLECTIBLES FOR THE HEAPLESS.",
-    "HEAP FRAGGED. SOUL INTACT."
+    "M0UNT Y0UR TR0PH13S. N0 SN1TCH3S.",
+    "C0LL3CT1BL3S F0R TH3 H34PL3SS.",
+    "H34P FR4GG3D. S0UL 1NT4CT."
+};
+static const char* const H_DEMANDS[] = {
+    "1 H0TK3Y. S3SS10N CH4LL3NG3S. 3 TR14LS.",
+    "P1G D3M4NDS. XP R3W4RDS. D41LY GR1ND.",
+    "D0 TH3 TR14LS. 34RN TH3 CH33S3."
 };
 static const char* const H_SETTINGS[] = {
     "NOW SCREAMS IN UPPERCASE!!!",
@@ -193,7 +203,8 @@ const uint8_t Menu::ROOT_COUNT = sizeof(ROOT_ITEMS) / sizeof(ROOT_ITEMS[0]);
 const MenuItem Menu::GROUP_ATTACK[] = {
     {"/>", "OINKS",  1,  H_OINK,   (uint8_t)(sizeof(H_OINK)/sizeof(H_OINK[0]))},
     {"!!", "BLUES", 8,  H_BLUES,  (uint8_t)(sizeof(H_BLUES)/sizeof(H_BLUES[0]))},
-    {"EP", "EVILPIG", 25, H_EVILPIG, (uint8_t)(sizeof(H_EVILPIG)/sizeof(H_EVILPIG[0]))}
+    {"EP", "EVILPIG", 25, H_EVILPIG, (uint8_t)(sizeof(H_EVILPIG)/sizeof(H_EVILPIG[0]))},
+    {"IR", "IRPORK", 28, H_IRPORK, (uint8_t)(sizeof(H_IRPORK)/sizeof(H_IRPORK[0]))}
 };
 const uint8_t Menu::GROUP_ATTACK_SIZE = sizeof(GROUP_ATTACK) / sizeof(GROUP_ATTACK[0]);
 
@@ -224,11 +235,12 @@ const MenuItem Menu::GROUP_COMMS[] = {
 };
 const uint8_t Menu::GROUP_COMMS_SIZE = sizeof(GROUP_COMMS) / sizeof(GROUP_COMMS[0]);
 
-// Group: RANK - progression and street cred
+// Group: RANK - progression and street cred (original labels)
 const MenuItem Menu::GROUP_RANK[] = {
-    {"^#", "FLEXES",    11, H_FLEX,   (uint8_t)(sizeof(H_FLEX)/sizeof(H_FLEX[0]))},
-    {"*#", "BADGES",   9, H_BADGES, (uint8_t)(sizeof(H_BADGES)/sizeof(H_BADGES[0]))},
-    {"?*", "UNLOCK",  15, H_SNOUTS, (uint8_t)(sizeof(H_SNOUTS)/sizeof(H_SNOUTS[0]))},
+    {"^#", "FLEXES",   11, H_FLEX,     (uint8_t)(sizeof(H_FLEX)/sizeof(H_FLEX[0]))},
+    {"1#", "DEMANDS",  29, H_DEMANDS,  (uint8_t)(sizeof(H_DEMANDS)/sizeof(H_DEMANDS[0]))},
+    {"*#", "BADGES",    9, H_BADGES,   (uint8_t)(sizeof(H_BADGES)/sizeof(H_BADGES[0]))},
+    {"?*", "UNLOCK",   15, H_SNOUTS,   (uint8_t)(sizeof(H_SNOUTS)/sizeof(H_SNOUTS[0]))},
     {"g)", "FRUITRUN", 27, H_FRUITRUN, (uint8_t)(sizeof(H_FRUITRUN)/sizeof(H_FRUITRUN[0]))}
 };
 const uint8_t Menu::GROUP_RANK_SIZE = sizeof(GROUP_RANK) / sizeof(GROUP_RANK[0]);

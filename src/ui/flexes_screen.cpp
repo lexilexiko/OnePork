@@ -139,34 +139,22 @@ void FlexesScreen::handleInput() {
     if (keyWasPressed) return;
     keyWasPressed = true;
     
-    // Tab cycling: ',' cycles left, '/' cycles right
+    // Tab cycling: ',' left, '/' right — ST4TS → B00ST → GR1ND → W1GL3
     if (M5Cardputer.Keyboard.isKeyPressed(',')) {
-        // Cycle left: STATS -> WIGLE -> BOOSTS -> STATS
         switch (currentTab) {
-            case StatsTab::STATS:
-                currentTab = StatsTab::WIGLE;
-                break;
-            case StatsTab::BOOSTS:
-                currentTab = StatsTab::STATS;
-                break;
-            case StatsTab::WIGLE:
-                currentTab = StatsTab::BOOSTS;
-                break;
+            case StatsTab::STATS:  currentTab = StatsTab::WIGLE;  break;
+            case StatsTab::BOOSTS: currentTab = StatsTab::STATS;  break;
+            case StatsTab::GRIND:  currentTab = StatsTab::BOOSTS; break;
+            case StatsTab::WIGLE:  currentTab = StatsTab::GRIND;  break;
         }
         return;
     }
     if (M5Cardputer.Keyboard.isKeyPressed('/')) {
-        // Cycle right: STATS -> BOOSTS -> WIGLE -> STATS
         switch (currentTab) {
-            case StatsTab::STATS:
-                currentTab = StatsTab::BOOSTS;
-                break;
-            case StatsTab::BOOSTS:
-                currentTab = StatsTab::WIGLE;
-                break;
-            case StatsTab::WIGLE:
-                currentTab = StatsTab::STATS;
-                break;
+            case StatsTab::STATS:  currentTab = StatsTab::BOOSTS; break;
+            case StatsTab::BOOSTS: currentTab = StatsTab::GRIND;  break;
+            case StatsTab::GRIND:  currentTab = StatsTab::WIGLE;  break;
+            case StatsTab::WIGLE:  currentTab = StatsTab::STATS;  break;
         }
         return;
     }
@@ -588,24 +576,23 @@ void FlexesScreen::draw(M5Canvas& canvas) {
         drawStatsTab(canvas);
     } else if (currentTab == StatsTab::BOOSTS) {
         drawBuffsTab(canvas);
+    } else if (currentTab == StatsTab::GRIND) {
+        drawGrindTab(canvas);
     } else if (currentTab == StatsTab::WIGLE) {
         drawWigleTab(canvas);
     }
-    
-
 }
 
 void FlexesScreen::drawTabBar(M5Canvas& canvas) {
     canvas.setTextSize(1);
     const int tabY = 0;
     const int tabH = 12;
-    const int tabTextY = 6;  // Add 1px top padding to match bottom margin
+    const int tabTextY = 6;
 
-    // Calculate dynamic widths for three tabs. Distribute any remainder pixels
-    // across the first tabs so that the tabs fill the available space evenly.
-    const int totalTabs = 3;
+    // Four tabs: ST4TS | B00STS | GR1ND | W1GL3
+    const int totalTabs = 4;
     const int margin = 2;
-    const int spacing = 3;
+    const int spacing = 2;
     const int availableW = DISPLAY_W - margin * 2 - spacing * (totalTabs - 1);
     const int baseW = availableW / totalTabs;
     const int remainder = availableW % totalTabs;
@@ -614,18 +601,12 @@ void FlexesScreen::drawTabBar(M5Canvas& canvas) {
     int x = margin;
     for (int i = 0; i < totalTabs; i++) {
         int w = baseW + (i < remainder ? 1 : 0);
-        bool isActive;
-        const char* label;
-        if (i == 0) {
-            isActive = (currentTab == StatsTab::STATS);
-            label = "ST4TS";
-        } else if (i == 1) {
-            isActive = (currentTab == StatsTab::BOOSTS);
-            label = "B00STS";
-        } else {
-            isActive = (currentTab == StatsTab::WIGLE);
-            label = "W1GL3";
-        }
+        bool isActive = false;
+        const char* label = "";
+        if (i == 0) { isActive = (currentTab == StatsTab::STATS);  label = "ST4TS"; }
+        else if (i == 1) { isActive = (currentTab == StatsTab::BOOSTS); label = "B00ST"; }
+        else if (i == 2) { isActive = (currentTab == StatsTab::GRIND);  label = "GR1ND"; }
+        else { isActive = (currentTab == StatsTab::WIGLE); label = "W1GL3"; }
         if (isActive) {
             canvas.fillRect(x, tabY, w, tabH, COLOR_FG);
             canvas.setTextColor(COLOR_BG);
@@ -636,7 +617,6 @@ void FlexesScreen::drawTabBar(M5Canvas& canvas) {
         canvas.drawString(label, x + w / 2, tabTextY);
         x += w + spacing;
     }
-    // Reset text color
     canvas.setTextColor(COLOR_FG);
 }
 
@@ -677,14 +657,58 @@ void FlexesScreen::drawStatsTab(M5Canvas& canvas) {
         canvas.fillRect(barX + 1, barY + 1, fillW, barH - 2, COLOR_FG);
     }
     
-    // XP text centered under bar
-    char xpBuf[32];
-    snprintf(xpBuf, sizeof(xpBuf), "%lu XP (%d%%)", (unsigned long)XP::getTotalXP(), progress);
+    // XP text + need for next level
+    char xpBuf[40];
+    uint32_t need = XP::getXPToNextLevel();
+    if (level >= 50) {
+        snprintf(xpBuf, sizeof(xpBuf), "%lu XP MAX", (unsigned long)XP::getTotalXP());
+    } else {
+        snprintf(xpBuf, sizeof(xpBuf), "%lu XP  N33D %lu",
+                 (unsigned long)XP::getTotalXP(), (unsigned long)need);
+    }
     canvas.setTextDatum(top_center);
     canvas.drawString(xpBuf, DISPLAY_W / 2, 32);
     
     // Stats grid
     drawStats(canvas);
+}
+
+void FlexesScreen::drawGrindTab(M5Canvas& canvas) {
+    canvas.setTextSize(1);
+    canvas.setTextDatum(top_left);
+
+    uint8_t level = XP::getLevel();
+    uint32_t need = XP::getXPToNextLevel();
+    char head[48];
+    if (level >= 50) {
+        snprintf(head, sizeof(head), "LVL %u MAX. ST1LL FL3X.", (unsigned)level);
+    } else {
+        snprintf(head, sizeof(head), "N3XT LVL: %lu XP  (/%u%%)",
+                 (unsigned long)need, (unsigned)XP::getProgress());
+    }
+    canvas.drawString(head, 4, 14);
+    // Clear goal: do stuff → get XP → pig level goes up
+    canvas.drawString("D0 = +XP = P1G LVL UP", 4, 26);
+
+    // What actions award XP toward next level
+    static const char* const LINES[] = {
+        "O1NK  HS +50  PMK1D +75  nets +1",
+        "DNH   pass1ve nets +2  gh0st +150",
+        "W4RH0G walk +30 XP / km",
+        "BLU3S BLE spam +XP  exit +15",
+        "P1GP4SS crack pass = flex XP",
+        "D3M4NDS (1) dailies = big XP",
+        "FRU1T (G) pick fruit = +XP",
+        "UPL0AD W1GL3/WPA-SEC bon4s XP",
+        "S3SS10N 30/60/120m +10/+25/+50",
+        "M0R3 XP = H1GH3R LVL 4 P1G",
+    };
+    int y = 38;
+    for (uint8_t i = 0; i < 10; i++) {
+        canvas.drawString(LINES[i], 4, y);
+        y += 9;
+        if (y > MAIN_H - 4) break;
+    }
 }
 
 void FlexesScreen::drawBuffsTab(M5Canvas& canvas) {

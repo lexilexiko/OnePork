@@ -1,10 +1,11 @@
 // Scene trees — separate from Avatar so we can mix kinds freely.
 //
-// (1) FRUIT  — seasonal main tree (spring birch / summer green apple /
-//              autumn oak / winter fir); drops produce when applicable
+// (1) FRUIT  — seasonal main tree (spring cherry / summer apple /
+//              autumn old apple / winter fir); drops produce when applicable
 // (2) DECOR  — seasonal scenery; winter = classic snowy tree (not 2nd fir)
 // (3) BERRY  — bush; berries fall when stomped
-// Autumn oak tree drops soft green apples (bush stays berries)
+// Spring cherry: pink blossom canopy + paired cherries
+// Autumn old apple: soft green apples (bush stays berries)
 //
 // None push the pig. All can be broken by airborne stomps (jumps).
 // Call Trees::draw after sky/clouds, before pig.

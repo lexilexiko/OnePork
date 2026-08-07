@@ -31,6 +31,7 @@
 #include "../modes/micpork.h"
 #include "../modes/evilpig.h"
 #include "../modes/fruit_run.h"
+#include "../modes/ir_pork.h"
 #include "../modes/charging.h"
 #include "../modes/pigpass.h"
 #include "../gps/gps.h"
@@ -303,7 +304,8 @@ void Display::update() {
         mode == PorkchopMode::PIGGYBLUES_MODE ||
         mode == PorkchopMode::BACON_MODE ||
         mode == PorkchopMode::MICPORK_MODE ||
-        mode == PorkchopMode::FRUIT_RUN_MODE);
+        mode == PorkchopMode::FRUIT_RUN_MODE ||
+        mode == PorkchopMode::IR_PORK_MODE);
 
     // Weather first so top-bar cloud bleed + thunder flash match this frame.
     // When scene is suspended (PigPass / EvilPig / WPA-SEC / WiGLE / Xfer), park
@@ -444,6 +446,9 @@ void Display::update() {
             break;
         case PorkchopMode::FRUIT_RUN_MODE:
             FruitRunMode::draw(mainCanvas);
+            break;
+        case PorkchopMode::IR_PORK_MODE:
+            IrPorkMode::draw(mainCanvas);
             break;
         case PorkchopMode::EVILPIG_MODE:
             EvilPigMode::draw(mainCanvas);
@@ -775,7 +780,8 @@ void Display::drawTopBar() {
         (mode == PorkchopMode::IDLE || mode == PorkchopMode::OINK_MODE ||
          mode == PorkchopMode::DNH_MODE || mode == PorkchopMode::WARHOG_MODE ||
          mode == PorkchopMode::PIGGYBLUES_MODE || mode == PorkchopMode::BACON_MODE ||
-         mode == PorkchopMode::MICPORK_MODE || mode == PorkchopMode::FRUIT_RUN_MODE);
+         mode == PorkchopMode::MICPORK_MODE || mode == PorkchopMode::FRUIT_RUN_MODE ||
+         mode == PorkchopMode::IR_PORK_MODE);
     // Flash white with thunder so bar doesn't stay a hard cut line
     const uint16_t barBg = avatarScene
         ? (Weather::isThunderFlashing() ? (uint16_t)0xFFFF : Avatar::getSkyColor())
@@ -878,7 +884,12 @@ void Display::drawTopBar() {
             modeColor = barFg;
             break;
         case PorkchopMode::FRUIT_RUN_MODE:
-            snprintf(modeBuf, sizeof(modeBuf), "FRUITRUN");
+            // Game stats on top bar (not generic FRUITRUN + battery clutter)
+            FruitRunMode::getTopBarLabel(modeBuf, sizeof(modeBuf));
+            modeColor = barFg;
+            break;
+        case PorkchopMode::IR_PORK_MODE:
+            IrPorkMode::getTopBarLabel(modeBuf, sizeof(modeBuf));
             modeColor = barFg;
             break;
         case PorkchopMode::EVILPIG_MODE:
@@ -1224,20 +1235,24 @@ void Display::drawBottomBar() {
         statsBuf[sizeof(statsBuf) - 1] = '\0';
         statsStr = statsBuf;
     } else if (mode == PorkchopMode::MICPORK_MODE) {
+        // Mic dance feedback only — no wifi/net junk
         char buf[48];
-        snprintf(buf, sizeof(buf), "MIC LVL:%03u%%  BARS:%u",
-                 (unsigned)MicPorkMode::getLevelPct(),
-                 (unsigned)MicPorkMode::getBandCount());
+        snprintf(buf, sizeof(buf), "MIC %s  LVL:%03u%%  M=STOP",
+                 MicPorkMode::getLevelPct() > 12 ? "HEAR" : "QUIET",
+                 (unsigned)MicPorkMode::getLevelPct());
         strncpy(statsBuf, buf, sizeof(statsBuf) - 1);
         statsBuf[sizeof(statsBuf) - 1] = '\0';
         statsStr = statsBuf;
+        showHealthBar = false;
     } else if (mode == PorkchopMode::FRUIT_RUN_MODE) {
-        char buf[48];
-        snprintf(buf, sizeof(buf), "FRUIT:%u  ;/.WALK SPACE=JUMP",
-                 (unsigned)FruitRunMode::getFruits());
-        strncpy(statsBuf, buf, sizeof(statsBuf) - 1);
-        statsBuf[sizeof(statsBuf) - 1] = '\0';
+        // Full game HUD on bottom bar (fruits / lives / wolf %)
+        FruitRunMode::getStatusLine(statsBuf, sizeof(statsBuf));
         statsStr = statsBuf;
+        showHealthBar = false;  // no heap bar in mini-game
+    } else if (mode == PorkchopMode::IR_PORK_MODE) {
+        IrPorkMode::getStatusLine(statsBuf, sizeof(statsBuf));
+        statsStr = statsBuf;
+        showHealthBar = false;
     } else if (mode == PorkchopMode::EVILPIG_MODE) {
         // Short key map + live status (full legend also on main canvas)
         auto ph = EvilPigMode::getPhase();
@@ -1596,41 +1611,40 @@ static void bootSplashDelay(uint32_t ms) {
     }
 }
 
-// Boot splash - 3 screens: OINK OINK, MY NAME IS, PORKCHOP
+// Boot splash — same 500/500/700(/600) timing as stock; One Pork fan branding
 void Display::showBootSplash() {
     // Ensure splash uses 8-bit RGB332 to match sprite palette and avoid 16-bit conversion costs.
     // Splash draws directly to the display (no sprite heap allocation), but color depth still matters.
     M5.Display.setColorDepth(8);
 
-    // Screen 1: OINK OINK
+    // Screen 1: two-line wake (replaces stock OINK/OINK)
     M5.Display.fillScreen(COLOR_BG);
     M5.Display.setTextColor(COLOR_FG);
     M5.Display.setTextDatum(middle_center);
     M5.Display.setTextSize(4);
-    M5.Display.drawString("OINK", DISPLAY_W / 2, DISPLAY_H / 2 - 20);
-    M5.Display.drawString("OINK", DISPLAY_W / 2, DISPLAY_H / 2 + 20);
-    
-    // Pig wake-up grunt: "oink oink"
+    M5.Display.drawString("0N3", DISPLAY_W / 2, DISPLAY_H / 2 - 20);
+    M5.Display.drawString("P0RK", DISPLAY_W / 2, DISPLAY_H / 2 + 20);
+
     SFX::play(SFX::BOOT);
-    
+
     bootSplashDelay(500);
-    
-    // Screen 2: MY NAME IS
+
+    // Screen 2 (was "MY NAME IS")
     M5.Display.fillScreen(COLOR_BG);
     M5.Display.setTextSize(3);
-    M5.Display.drawString("MY NAME IS", DISPLAY_W / 2, DISPLAY_H / 2);
+    M5.Display.drawString("F4N P4CK", DISPLAY_W / 2, DISPLAY_H / 2);
     bootSplashDelay(500);
-    
-    // Screen 3: PORKCHOP in big stylized text
+
+    // Screen 3: package title + credits
     M5.Display.fillScreen(COLOR_BG);
     M5.Display.setTextDatum(middle_center);
     M5.Display.setTextSize(3);
-    M5.Display.drawString("PORKCHOP", DISPLAY_W / 2, DISPLAY_H / 2 - 15);
-    
-    // Subtitle
+    M5.Display.drawString("0N3 P0RK", DISPLAY_W / 2, DISPLAY_H / 2 - 18);
+
     M5.Display.setTextSize(1);
-    M5.Display.drawString("BASICALLY YOU, BUT AS AN ASCII PIG.", DISPLAY_W / 2, DISPLAY_H / 2 + 20);
-    M5.Display.drawString("IDENTITY CRISIS EDITION.", DISPLAY_W / 2, DISPLAY_H / 2 + 35);
+    M5.Display.drawString("F4N BU1LD 0F M5P0RKCH0P", DISPLAY_W / 2, DISPLAY_H / 2 + 12);
+    M5.Display.drawString("v0.1.8c (1.4)  0N3 P0RK", DISPLAY_W / 2, DISPLAY_H / 2 + 24);
+    M5.Display.drawString("D0N4T3 0ct0. FL3X L3X1.", DISPLAY_W / 2, DISPLAY_H / 2 + 36);
 
     bootSplashDelay(700);
 
@@ -1640,7 +1654,7 @@ void Display::showBootSplash() {
         M5.Display.fillScreen(COLOR_BG);
         M5.Display.setTextDatum(middle_center);
         M5.Display.setTextSize(2);
-        M5.Display.drawString("WELCOME BACK", DISPLAY_W / 2, DISPLAY_H / 2 - 15);
+        M5.Display.drawString("W3LC0M3 B4CK", DISPLAY_W / 2, DISPLAY_H / 2 - 15);
         M5.Display.setTextSize(3);
         M5.Display.drawString(cs, DISPLAY_W / 2, DISPLAY_H / 2 + 15);
         bootSplashDelay(600);
@@ -3031,28 +3045,26 @@ void Display::drawSettingsScreen(M5Canvas& canvas) {
     canvas.drawString("[BKSP] TO GO BACK", DISPLAY_W / 2, MAIN_H - 12);
 }
 
-// Hacker quotes for About screen
+// Hacker quotes for About screen (0ct0 vibe + One Pork)
 static const char* ABOUT_QUOTES[] = {
-    "HACK THE PLANET",
-    "SHALL WE PLAY A GAME",
-    "sudo make me bacon",
-    "root@porkchop:~#",
-    "WHILE(1) { PWN(); }",
-    "#!/usr/bin/oink",
+    "H4CK TH3 PL4N3T",
+    "SH4LL W3 PL4Y 4 G4M3",
+    "sud0 m4k3 m3 b4c0n",
+    "r00t@0n3p0rk:~#",
+    "WH1L3(1) { PWN(); }",
+    "#!/usr/bin/o1nk",
     "0WN3D BY 0ct0",
-    "CURIOSITY IS NOT A CRIME",
-    "MY CRIME IS CURIOSITY",
-    "INFORMATION WANTS TO BE FREE",
-    "SMASH THE STACK",
-    "THERE IS NO PATCH",
-    "TRUST NO AP",
-    "PROMISCUOUS BY NATURE",
-    "802.11 WARL0RD",
-    "0xDEADP0RK",
-    "SEGFAULT IN THE MATRIX",
-    "PACKET OR GTFO",
-    "THE CONSCIENCE OF A HACKER",
-    "EXPLOIT ADAPT OVERCOME"
+    "D0N4T3 TH3 CR34T0R",
+    "CUR10S1TY 1S N0T 4 CR1M3",
+    "1NF0 W4NTS T0 B3 FR33",
+    "SM4SH TH3 ST4CK",
+    "TRU5T N0 4P",
+    "802.11 W4RL0RD",
+    "0xD34DP0RK",
+    "P4CK3T 0R GTF0",
+    "F4N STR4W 0N TH3 B4RN",
+    "0N3 P0RK. M4NY 01NKS.",
+    "3XPLO1T 4D4PT 0V3RC0M3"
 };
 static const int ABOUT_QUOTES_COUNT = sizeof(ABOUT_QUOTES) / sizeof(ABOUT_QUOTES[0]);
 static int aboutQuoteIndex = 0;
@@ -3086,29 +3098,33 @@ void Display::drawAboutScreen(M5Canvas& canvas) {
     canvas.setTextColor(COLOR_FG);
     canvas.setTextDatum(top_center);
     
-    // Title
+    // Title — fan package + version
     canvas.setTextSize(2);
     canvas.setTextColor(COLOR_ACCENT);
-    canvas.drawString("M5PORKCHOP", DISPLAY_W / 2, 4);
+    canvas.drawString("0N3 P0RK", DISPLAY_W / 2, 2);
     
     canvas.setTextSize(1);
-    // Upstream
-    canvas.setTextColor(COLOR_FG);
-    canvas.drawString("BY 0ct0", DISPLAY_W / 2, 26);
-    canvas.drawString("GITHUB.COM/0CT0SEC/M5PORKCHOP", DISPLAY_W / 2, 38);
-    
-    // Mode fork (us) — no version strings
-    canvas.setTextColor(COLOR_ACCENT);
-    canvas.drawString("MODE:", DISPLAY_W / 2, 54);
     canvas.setTextColor(UiStyle::CYAN);
-    canvas.drawString("GITHUB.COM/LEXILEXIKO", DISPLAY_W / 2, 66);
-    canvas.drawString("M5PORKCHOP-L3XIK0", DISPLAY_W / 2, 78);
+    canvas.drawString("v0.1.8c (1.4)", DISPLAY_W / 2, 20);
+
+    // Upstream creator first (always)
+    canvas.setTextColor(COLOR_FG);
+    canvas.drawString("B4S3: M5P0RKCH0P BY 0ct0", DISPLAY_W / 2, 32);
+    canvas.drawString("D0N4T3: BUYMEACOFFEE.COM/0CT0", DISPLAY_W / 2, 42);
+    
+    // Fan fork
+    canvas.setTextColor(COLOR_ACCENT);
+    canvas.drawString("F4N P4CK: LEX1LEX1K0", DISPLAY_W / 2, 54);
+    canvas.setTextColor(UiStyle::CYAN);
+    canvas.drawString("G1THUB.COM/LEXILEXIKO/0N3P0RK", DISPLAY_W / 2, 64);
+    canvas.setTextColor(COLOR_FG);
+    canvas.drawString("1R·FRU1T·S3AS0N·RANK RPG", DISPLAY_W / 2, 76);
     
     // Random quote
     canvas.setTextColor(COLOR_FG);
     char quoteBuf[48];
     snprintf(quoteBuf, sizeof(quoteBuf), "\"%s\"", ABOUT_QUOTES[aboutQuoteIndex]);
-    canvas.drawString(quoteBuf, DISPLAY_W / 2, 92);
+    canvas.drawString(quoteBuf, DISPLAY_W / 2, 90);
     
     // Easter egg hint
     canvas.setTextColor(COLOR_ACCENT);

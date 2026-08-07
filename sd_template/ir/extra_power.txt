@@ -1,0 +1,11 @@
+# IR PORK custom pack — put this file on SD card as /ir/extra_power.txt
+# Format:  PROTOCOL  ADDR  CMD  [optional name]
+# Protocols: NEC  SAMSUNG  SONY
+# Numbers: decimal or 0xHEX
+#
+# In IR PORK mode press E (or I again) → pick this file → SPACE to blast
+
+NEC 0x00FF 0x45 MyNEC
+NEC 0x20DF 0x10 LG
+SAMSUNG 0xE0E0 0x40BF SamsungTV
+SONY 0xA90 12 Sony12

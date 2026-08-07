@@ -53,7 +53,8 @@ struct BuffState {
 enum class StatsTab : uint8_t {
     STATS = 0,
     BOOSTS = 1,
-    WIGLE = 2
+    GRIND = 2,   // how to earn XP / level up
+    WIGLE = 3
 };
 
 class FlexesScreen {
@@ -100,6 +101,7 @@ private:
     static void handleInput();
     static void drawStatsTab(M5Canvas& canvas);
     static void drawBuffsTab(M5Canvas& canvas);
+    static void drawGrindTab(M5Canvas& canvas);  // XP tips / what to do next
     static void drawTabBar(M5Canvas& canvas);
     static void drawStats(M5Canvas& canvas);  // Stat grid helper
 
