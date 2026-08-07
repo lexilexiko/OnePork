@@ -371,7 +371,7 @@ void Porkchop::setMode(PorkchopMode mode) {
         (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
 
     // Park pig scene during CPU/heap-heavy modes so mood/weather/wolf
-    // don't compete with PBKDF2, SoftAP, or TLS xfer. (BLUES left alone — stock path.)
+    // don't compete with PBKDF2, SoftAP, or TLS xfer.
     auto isSceneHeavy = [](PorkchopMode m) {
         return m == PorkchopMode::PIGPASS_MODE ||
                m == PorkchopMode::EVILPIG_MODE ||
@@ -381,6 +381,18 @@ void Porkchop::setMode(PorkchopMode mode) {
         Avatar::suspendScene();
     } else if (!isSceneHeavy(mode) && isSceneHeavy(oldMode)) {
         Avatar::resumeScene();
+    }
+
+    // Wolf only on free roam (IDLE) or Fruit Run — never during O/W/B/D/I/…
+    auto wolfAllowed = [](PorkchopMode m) {
+        return m == PorkchopMode::IDLE || m == PorkchopMode::FRUIT_RUN_MODE;
+    };
+    if (!wolfAllowed(mode)) {
+        Wolf::reset();
+        Wolf::setAutoSpawn(false);
+    } else if (mode == PorkchopMode::IDLE) {
+        // Fruit Run manages its own spawn; IDLE gets ambient visitors back
+        Wolf::setAutoSpawn(true);
     }
     
     // Cleanup the mode we're actually leaving (oldMode), not previousMode

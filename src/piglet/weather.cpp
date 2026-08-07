@@ -469,6 +469,7 @@ static bool seasonIsWinter() { return activeSeason == Season::WINTER; }
 static bool seasonIsSpring() { return activeSeason == Season::SPRING; }
 static bool seasonIsSummer() { return activeSeason == Season::SUMMER; }
 static bool seasonIsAutumn() { return activeSeason == Season::AUTUMN; }
+static bool seasonIsRetro()  { return activeSeason == Season::RETRO; }
 
 Season getActiveSeason() { return activeSeason; }
 
@@ -478,6 +479,7 @@ const char* getSeasonName() {
         case Season::SUMMER: return "SUMMER";
         case Season::AUTUMN: return "AUTUMN";
         case Season::WINTER: return "WINTER";
+        case Season::RETRO:  return "RETRO";
     }
     return "SUMMER";
 }
@@ -497,22 +499,24 @@ static void updateSeasonCycle(uint32_t now) {
     uint8_t mode = Config::personality().seasonMode;
     if (mode >= SEASON_MODE_COUNT) mode = 0;
 
-    // Manual mode — lock season
+    // Manual mode — lock season (RETRO included, not part of AUTO cycle)
     if (mode != (uint8_t)SeasonMode::AUTO) {
         Season forced = Season::SUMMER;
         if (mode == (uint8_t)SeasonMode::SPRING) forced = Season::SPRING;
         else if (mode == (uint8_t)SeasonMode::SUMMER) forced = Season::SUMMER;
         else if (mode == (uint8_t)SeasonMode::AUTUMN) forced = Season::AUTUMN;
         else if (mode == (uint8_t)SeasonMode::WINTER) forced = Season::WINTER;
+        else if (mode == (uint8_t)SeasonMode::RETRO)  forced = Season::RETRO;
         bool changed = (lastSeasonModeCfg != mode) || (activeSeason != forced);
         setActiveSeason(forced, now, changed && lastSeasonModeCfg != 255);
         lastSeasonModeCfg = mode;
         return;
     }
 
-    // AUTO — advance every 15 minutes
+    // AUTO — advance every 15 minutes (SPRING..WINTER only, never RETRO)
     if (lastSeasonModeCfg != mode) {
-        // Just switched to AUTO: keep current season, reset timer
+        // Just switched to AUTO: leave RETRO if stuck there
+        if (activeSeason == Season::RETRO) activeSeason = Season::SUMMER;
         lastSeasonModeCfg = mode;
         seasonStartedMs = now;
         return;
@@ -522,19 +526,21 @@ static void updateSeasonCycle(uint32_t now) {
         return;
     }
     if (now - seasonStartedMs >= SEASON_CYCLE_MS) {
-        Season next = (Season)(((uint8_t)activeSeason + 1) % SEASON_COUNT);
+        uint8_t cur = (uint8_t)activeSeason;
+        if (cur >= SEASON_COUNT) cur = 0;
+        Season next = (Season)((cur + 1) % SEASON_COUNT);
         setActiveSeason(next, now, true);
     }
 }
 
 void setRaining(bool active) {
     if (active && !rainActive) {
-        int n = seasonIsWinter() ? SNOW_FLAKE_COUNT : RAIN_DROP_COUNT;
+        int n = (seasonIsWinter() || seasonIsRetro()) ? SNOW_FLAKE_COUNT : RAIN_DROP_COUNT;
         for (int i = 0; i < n; i++) {
             rainDrops[i].x = (float)random(0, DISPLAY_W);
-            if (seasonIsWinter()) {
+            if (seasonIsWinter() || seasonIsRetro()) {
                 rainDrops[i].speed = random(1, 3);
-                rainDrops[i].len = (uint8_t)random(1, 3);  // 1=tiny, 2=small cross
+                rainDrops[i].len = (uint8_t)random(1, 3);  // 1=tiny, 2=small cross / pixel size
                 // Spread full height so first frame already snows from the bar
                 rainDrops[i].y = (float)random(0, 100);
             } else if (seasonIsSummer()) {
@@ -782,14 +788,14 @@ static void updateClouds(uint32_t now) {
 }
 
 static void updateRain(uint32_t now) {
-    // Snow ticks a bit slower for soft flakes
-    uint16_t tickMs = seasonIsWinter() ? 36 : RAIN_SPEED_MS;
+    // Snow / retro pixels tick a bit slower for soft fall
+    uint16_t tickMs = (seasonIsWinter() || seasonIsRetro()) ? 36 : RAIN_SPEED_MS;
     if (now - lastRainUpdate < tickMs) return;
     lastRainUpdate = now;
 
     float horizontalDrift = 0.0f;
     if (Avatar::isGrassMoving()) {
-        if (seasonIsWinter()) {
+        if (seasonIsWinter() || seasonIsRetro()) {
             // Soft parallax only — old formula used grassSpeed ms and turned
             // fast SCROLL SPD into a full blizzard while walking
             horizontalDrift = Avatar::isGrassDirectionRight() ? -0.7f : 0.7f;
@@ -808,15 +814,15 @@ static void updateRain(uint32_t now) {
             }
         }
     }
-    if (seasonIsWinter()) {
+    if (seasonIsWinter() || seasonIsRetro()) {
         // Gentle flutter, not storm
         horizontalDrift += (float)(random(0, 3) - 1) * 0.25f;
     }
 
-    int n = seasonIsWinter() ? SNOW_FLAKE_COUNT : RAIN_DROP_COUNT;
+    int n = (seasonIsWinter() || seasonIsRetro()) ? SNOW_FLAKE_COUNT : RAIN_DROP_COUNT;
     for (int i = 0; i < n; i++) {
         float fall = (float)rainDrops[i].speed;
-        if (seasonIsWinter()) fall = 0.5f + (float)rainDrops[i].speed * 0.55f;
+        if (seasonIsWinter() || seasonIsRetro()) fall = 0.5f + (float)rainDrops[i].speed * 0.55f;
         rainDrops[i].y += fall;
         rainDrops[i].x += horizontalDrift;
 
@@ -824,11 +830,11 @@ static void updateRain(uint32_t now) {
         if (rainDrops[i].x >= (float)DISPLAY_W) rainDrops[i].x -= (float)DISPLAY_W;
 
         if (rainDrops[i].y >= 103.0f) {
-            // Winter: re-enter from the very top of the scene (under top bar)
-            rainDrops[i].y = seasonIsWinter() ? (float)random(0, 8)
+            // Winter/retro: re-enter from the very top of the scene (under top bar)
+            rainDrops[i].y = (seasonIsWinter() || seasonIsRetro()) ? (float)random(0, 8)
                                               : (float)random(8, 24);
             rainDrops[i].x = (float)random(0, DISPLAY_W);
-            if (seasonIsWinter()) {
+            if (seasonIsWinter() || seasonIsRetro()) {
                 rainDrops[i].speed = random(1, 3);
                 rainDrops[i].len = (uint8_t)random(1, 3);
             } else if (seasonIsSummer()) {
@@ -1032,10 +1038,18 @@ void drawClouds(M5Canvas& canvas, uint16_t colorFG, int16_t yOffset) {
     const bool flash = isThunderFlashing();
     const bool storm = (weatherPhase == Phase::STORM);
     const bool wet = rainActive;
-    const uint16_t CLOUD_TOP   = flash ? 0xFFFF : (storm ? 0x9CF3 : 0xFFFF);
-    const uint16_t CLOUD_MID   = flash ? 0xFFFF : (storm ? 0x7BCF : (wet ? 0xC618 : 0xEF5D));
-    const uint16_t CLOUD_SHADE = flash ? 0xFFFF : (storm ? 0x528A : (wet ? 0x8410 : 0xBDF7));
-    const uint16_t CLOUD_RIM   = flash ? 0xFFFF : (storm ? 0x6B4D : 0xDEDB);
+    const bool retro = seasonIsRetro();
+    uint16_t CLOUD_TOP   = flash ? 0xFFFF : (storm ? 0x9CF3 : 0xFFFF);
+    uint16_t CLOUD_MID   = flash ? 0xFFFF : (storm ? 0x7BCF : (wet ? 0xC618 : 0xEF5D));
+    uint16_t CLOUD_SHADE = flash ? 0xFFFF : (storm ? 0x528A : (wet ? 0x8410 : 0xBDF7));
+    uint16_t CLOUD_RIM   = flash ? 0xFFFF : (storm ? 0x6B4D : 0xDEDB);
+    if (retro && !flash) {
+        // Film-stock clouds — pure grayscale
+        CLOUD_TOP   = 0xFFFF;
+        CLOUD_MID   = 0xC618;
+        CLOUD_SHADE = 0x8410;
+        CLOUD_RIM   = 0xAD55;
+    }
 
     float rainBoost = wet ? 1.7f : (weatherPhase == Phase::CLOUDY ? 1.25f : 1.0f);
     for (int i = 0; i < MAX_CLOUDS; i++) {
@@ -1072,6 +1086,7 @@ static inline int16_t birdSnap(int16_t v) {
 void drawBirds(M5Canvas& canvas, uint16_t colorFG) {
     (void)colorFG;
     const bool flash = isThunderFlashing();
+    const bool retro = seasonIsRetro();
 
     for (int i = 0; i < 2; i++) {
         if (!birds[i].active) continue;
@@ -1085,9 +1100,9 @@ void drawBirds(M5Canvas& canvas, uint16_t colorFG) {
             bool right = b.vx > 0;
 
             if (b.kind == 2) {
-                // Butterfly: colorful wings flap
-                uint16_t wing = flash ? 0xFFFF : ((i & 1) ? 0xFD1F : 0xFBE0);
-                uint16_t body = flash ? 0xFFFF : 0xFDB2;
+                // Butterfly: colorful wings flap (gray in RETRO)
+                uint16_t wing = flash ? 0xFFFF : (retro ? 0xC618 : ((i & 1) ? 0xFD1F : 0xFBE0));
+                uint16_t body = flash ? 0xFFFF : (retro ? 0x9CF3 : 0xFDB2);
                 int wy = wingsUp ? -2 : 1;
                 canvas.fillRect(bx, bodyY + wy, BIRD_PX, BIRD_PX, wing);
                 canvas.fillRect(bx + 2 * BIRD_PX, bodyY + wy, BIRD_PX, BIRD_PX, wing);
@@ -1095,31 +1110,31 @@ void drawBirds(M5Canvas& canvas, uint16_t colorFG) {
             } else if (b.kind == 1) {
                 // Seagull: white body + grey wings V
                 uint16_t body = flash ? 0xFFFF : 0xFFFF;
-                uint16_t wing = flash ? 0xFFFF : 0xBDF7;
+                uint16_t wing = flash ? 0xFFFF : (retro ? 0x8410 : 0xBDF7);
                 int16_t wingY = wingsUp ? (bodyY - BIRD_PX) : (bodyY + 1);
                 canvas.fillRect(bx, wingY, BIRD_PX, BIRD_PX, wing);
                 canvas.fillRect(bx + 2 * BIRD_PX, wingY, BIRD_PX, BIRD_PX, wing);
                 canvas.fillRect(bx + BIRD_PX, bodyY, BIRD_PX, BIRD_PX, body);
                 int16_t beakX = right ? (bx + 3 * BIRD_PX) : (bx - BIRD_PX);
-                canvas.fillRect(beakX, bodyY, BIRD_PX, BIRD_PX, flash ? 0xFFFF : 0xFDA0);
+                canvas.fillRect(beakX, bodyY, BIRD_PX, BIRD_PX, flash ? 0xFFFF : (retro ? 0xAD55 : 0xFDA0));
             } else {
                 // Sparrow: warm brown + cream + V wings
-                uint16_t body = flash ? 0xFFFF : 0x9AC8;
-                uint16_t wing = flash ? 0xFFFF : 0x82A6;
-                uint16_t belly = flash ? 0xFFFF : 0xF6B2;
+                uint16_t body = flash ? 0xFFFF : (retro ? 0x7BEF : 0x9AC8);
+                uint16_t wing = flash ? 0xFFFF : (retro ? 0x632C : 0x82A6);
+                uint16_t belly = flash ? 0xFFFF : (retro ? 0xC618 : 0xF6B2);
                 int16_t wingY = wingsUp ? (bodyY - BIRD_PX) : (bodyY + BIRD_PX);
                 canvas.fillRect(bx, wingY, BIRD_PX, BIRD_PX, wing);
                 canvas.fillRect(bx + 2 * BIRD_PX, wingY, BIRD_PX, BIRD_PX, wing);
                 canvas.fillRect(bx + BIRD_PX, bodyY, BIRD_PX, BIRD_PX, body);
                 canvas.fillRect(bx + BIRD_PX, bodyY + 1, BIRD_PX, 1, belly);
                 int16_t beakX = right ? (bx + 3 * BIRD_PX) : (bx - BIRD_PX);
-                canvas.fillRect(beakX, bodyY, BIRD_PX, BIRD_PX, flash ? 0xFFFF : 0xFD20);
+                canvas.fillRect(beakX, bodyY, BIRD_PX, BIRD_PX, flash ? 0xFFFF : (retro ? 0x9CF3 : 0xFD20));
             }
         } else {
             int16_t fx = birdSnap((int16_t)b.fallX);
             int16_t fy = birdSnap((int16_t)b.fallY);
-            uint16_t body = flash ? 0xFFFF : 0x9AC8;
-            uint16_t wing = flash ? 0xFFFF : 0x82A6;
+            uint16_t body = flash ? 0xFFFF : (retro ? 0x7BEF : 0x9AC8);
+            uint16_t wing = flash ? 0xFFFF : (retro ? 0x632C : 0x82A6);
             if (fy >= 0 && fy < 107) {
                 canvas.fillRect(fx, fy, BIRD_PX, BIRD_PX, body);
                 canvas.fillRect(fx + BIRD_PX, fy, BIRD_PX, BIRD_PX, wing);
@@ -1127,8 +1142,8 @@ void drawBirds(M5Canvas& canvas, uint16_t colorFG) {
         }
     }
 
-    // Sparks / explosions / impacts — warm orange/yellow (full color FX)
-    const uint16_t FX_COL = isThunderFlashing() ? 0xFFFF : 0xFD20;
+    // Sparks / explosions / impacts — warm orange/yellow (gray in RETRO)
+    const uint16_t FX_COL = isThunderFlashing() ? 0xFFFF : (retro ? 0xC618 : 0xFD20);
     for (int s = 0; s < 6; s++) {
         if (sparks[s].life == 0) continue;
         if (sparks[s].life < 4 && (sparks[s].life % 2 == 0)) continue;
@@ -1184,7 +1199,24 @@ void draw(M5Canvas& canvas, uint16_t colorFG, uint16_t colorBG) {
     // Snow banks / leaves / tumbleweed / butterflies → SeasonalFx::draw()
 
     if (rainActive) {
-        if (seasonIsWinter()) {
+        if (seasonIsRetro()) {
+            // Old film: blocky pixels falling (world dissolving into noise)
+            const uint16_t PX_LO = flash ? 0xFFFF : 0x8410;  // mid gray
+            const uint16_t PX_HI = flash ? 0xFFFF : 0xC618;  // light gray
+            const uint16_t PX_WH = 0xFFFF;
+            for (int i = 0; i < SNOW_FLAKE_COUNT; i++) {
+                int16_t rx = ((int16_t)rainDrops[i].x / 3) * 3;  // snap to 3px grid
+                int16_t ry = ((int16_t)rainDrops[i].y / 3) * 3;
+                if (ry < -6 || ry >= 104) continue;
+                uint8_t sz = (rainDrops[i].len <= 1) ? 2 : 3;
+                uint16_t c = (i & 2) ? PX_HI : PX_LO;
+                if ((i + (int)ry) & 4) c = PX_WH;
+                canvas.fillRect(rx, ry, sz, sz, c);
+                // trailing ghost pixel (film grain trail)
+                if (ry + 6 < 104)
+                    canvas.fillRect(rx + ((i & 1) ? 3 : -3), ry + 6, 2, 2, PX_LO);
+            }
+        } else if (seasonIsWinter()) {
             // Fat-pixel snowflakes (3px blocks, not 1px dust)
             for (int i = 0; i < SNOW_FLAKE_COUNT; i++) {
                 int16_t rx = (int16_t)rainDrops[i].x;

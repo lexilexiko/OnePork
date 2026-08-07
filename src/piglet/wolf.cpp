@@ -462,6 +462,11 @@ void draw(M5Canvas& canvas) {
             OUT  = 0x4000; FUR = 0xC2C0; FUR2 = 0x8000; FURH = 0xE3E0;
             BELLY = 0xFDE0; NOSE = 0x2100; EYE = 0xFD20; EAR = 0xFBE0;
             break;
+        case Season::RETRO:
+            // Silver-screen wolf — pure B&W film stock
+            OUT  = 0x2104; FUR = 0xAD55; FUR2 = 0x7BEF; FURH = 0xC618;
+            BELLY = 0xDEFB; NOSE = 0x0000; EYE = 0xFFFF; EAR = 0x8410;
+            break;
         case Season::SUMMER:
         default:
             OUT  = 0x41E0; FUR = 0x9A60; FUR2 = 0x7200; FURH = 0xD4A0;

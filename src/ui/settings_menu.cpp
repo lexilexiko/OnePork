@@ -10,6 +10,7 @@
 #include "../core/sdlog.h"
 #include "../gps/gps.h"
 #include "../piglet/wolf.h"
+#include "../piglet/scene_layers.h"
 #include <M5Cardputer.h>
 #include <SD.h>
 #include <string.h>
@@ -75,7 +76,17 @@ enum SettingId : uint8_t {
     SET_ANIM_TEST,
     SET_WOLF,
     SET_SCROLL_SPD,
-    SET_FRUIT_TREES
+    SET_FRUIT_TREES,
+    // Scene test lab (runtime layers — not NVS)
+    SET_SHOW_PIG,
+    SET_SHOW_GRASS,
+    SET_SHOW_TREES,
+    SET_FX_SKY,
+    SET_FX_WEATHER,
+    SET_FX_SEASON,
+    SET_FX_MOOD,
+    SET_CPU_HUD,
+    SET_SCENE_ALL
 };
 
 struct RootEntry {
@@ -107,19 +118,29 @@ static const EntryData kDirectEntries[] = {
     {SET_CALLSIGN, "C4LLS1GN", SettingType::TEXT, 0, 0, 0, "", "YOUR HANDLE"}
 };
 
-// Avatar scene: sky / season / wolf / walk / flora
+// Avatar scene: sky / season / wolf / walk / flora + test lab layers
 static const EntryData kSceneEntries[] = {
     {SET_SKY, "SKY", SettingType::VALUE, 0, (int)SKY_MODE_COUNT - 1, 1, "", "AUTO dusk/dawn / DAY / NIGHT"},
-    {SET_SEASON, "SEASON", SettingType::VALUE, 0, (int)SEASON_MODE_COUNT - 1, 1, "", "AUTO 15M / SPRING..WINTER"},
-    {SET_PIG_SKIN, "PIG SKIN", SettingType::VALUE, 0, (int)PIG_SKIN_COUNT - 1, 1, "", "CLASSIC/BLUSH/HOG/ZOMBIE"},
+    {SET_SEASON, "SEASON", SettingType::VALUE, 0, (int)SEASON_MODE_COUNT - 1, 1, "", "AUTO / SPRING..RETRO"},
+    {SET_PIG_SKIN, "PIG SKIN", SettingType::VALUE, 0, (int)PIG_SKIN_COUNT - 1, 1, "", "CLASSIC/BLUSH/HOG/ZOMBIE/RETRO"},
     {SET_SCROLL_SPD, "SCROLL SPD", SettingType::VALUE, 1, 10, 1, "", "WORLD SCROLL AT EDGES 1-10"},
     {SET_WOLF, "WOLF", SettingType::TOGGLE, 0, 1, 1, "", "RANDOM WOLF VISITOR ON/OFF"},
     {SET_FRUIT_TREES, "FRUIT TREES", SettingType::TOGGLE, 0, 1, 1, "", "RANDOM FRUIT TREES + DROPS"},
-    {SET_ANIM_TEST, "ANIM TEST", SettingType::TOGGLE, 0, 1, 1, "", "IDLE: -/= CYCLE EMOTIONS"}
+    {SET_ANIM_TEST, "ANIM TEST", SettingType::TOGGLE, 0, 1, 1, "", "IDLE: -/= CYCLE EMOTIONS"},
+    // --- TEST LAB (runtime, reboot restores all ON) ---
+    {SET_SCENE_ALL, "ALL LAYERS", SettingType::TOGGLE, 0, 1, 1, "", "MASTER: ON=full scene OFF=blank"},
+    {SET_SHOW_PIG, "SHOW PIG", SettingType::TOGGLE, 0, 1, 1, "", "DRAW PIG BODY"},
+    {SET_SHOW_GRASS, "SHOW GRASS", SettingType::TOGGLE, 0, 1, 1, "", "DRAW GRASS / DIRT"},
+    {SET_SHOW_TREES, "SHOW TREES", SettingType::TOGGLE, 0, 1, 1, "", "DRAW TREES/BUSHES/DROPS"},
+    {SET_FX_SKY, "SHOW SKY", SettingType::TOGGLE, 0, 1, 1, "", "SKY GRADIENT BACKDROP"},
+    {SET_FX_WEATHER, "SHOW WEATHER", SettingType::TOGGLE, 0, 1, 1, "", "RAIN SNOW CLOUDS BIRDS"},
+    {SET_FX_SEASON, "SHOW SEASON FX", SettingType::TOGGLE, 0, 1, 1, "", "LEAVES BANKS BUTTERFLIES"},
+    {SET_FX_MOOD, "SHOW MOOD", SettingType::TOGGLE, 0, 1, 1, "", "SPEECH BUBBLE MONOLOGUE"},
+    {SET_CPU_HUD, "CPU HUD", SettingType::TOGGLE, 0, 1, 1, "", "SHOW CPU% + FRAME MS IN TOP BAR"}
 };
 
 static const RootEntry kRootEntries[] = {
-    {"SCENE", "SKY SEASON WALK WOLF FLORA", true, GROUP_SCENE, SET_SKY},
+    {"SCENE", "SKY SEASON LAYERS CPU LAB", true, GROUP_SCENE, SET_SKY},
     {"BRIGHTNESS", "SCREEN GLOW LEVEL", false, GROUP_NONE, SET_BRIGHTNESS},
     {"SOUND", "0=OFF 1-5=VOLUME", false, GROUP_NONE, SET_SOUND},
     {"DIM AFTER", "0 = NEVER DIM", false, GROUP_NONE, SET_DIM_AFTER},
@@ -218,14 +239,16 @@ static const char* const kPigSkinLabels[PIG_SKIN_COUNT] = {
     "CLASSIC",
     "BLUSH",
     "HOG",
-    "ZOMBIE"
+    "ZOMBIE",
+    "RETRO"
 };
 static const char* const kSeasonModeLabels[SEASON_MODE_COUNT] = {
     "AUTO",
     "SPRING",
     "SUMMER",
     "AUTUMN",
-    "WINTER"
+    "WINTER",
+    "RETRO"
 };
 
 static const uint32_t kGpsBaudRates[] = {9600, 38400, 57600, 115200};
@@ -609,11 +632,32 @@ static int getSettingValue(SettingId id) {
         case SET_ANIM_TEST:
             return Config::personality().animTest ? 1 : 0;
         case SET_WOLF:
-            return Config::personality().wolfEnabled ? 1 : 0;
+            // Personality + test-lab layer (either off → show OFF)
+            return (Config::personality().wolfEnabled && SceneLayers::wolf) ? 1 : 0;
         case SET_SCROLL_SPD:
             return Config::personality().scrollSpeed;
         case SET_FRUIT_TREES:
             return Config::personality().fruitTreesAmbient ? 1 : 0;
+        case SET_SHOW_PIG:
+            return SceneLayers::pig ? 1 : 0;
+        case SET_SHOW_GRASS:
+            return SceneLayers::grass ? 1 : 0;
+        case SET_SHOW_TREES:
+            return SceneLayers::trees ? 1 : 0;
+        case SET_FX_SKY:
+            return SceneLayers::sky ? 1 : 0;
+        case SET_FX_WEATHER:
+            return SceneLayers::weather ? 1 : 0;
+        case SET_FX_SEASON:
+            return SceneLayers::seasonFx ? 1 : 0;
+        case SET_FX_MOOD:
+            return SceneLayers::mood ? 1 : 0;
+        case SET_CPU_HUD:
+            return SceneLayers::cpuHud ? 1 : 0;
+        case SET_SCENE_ALL:
+            return (SceneLayers::pig && SceneLayers::grass && SceneLayers::trees &&
+                    SceneLayers::sky && SceneLayers::weather && SceneLayers::seasonFx &&
+                    SceneLayers::mood && SceneLayers::wolf) ? 1 : 0;
         case SET_CH_HOP:
             return Config::wifi().channelHopInterval;
         case SET_SPEC_SWEEP:
@@ -698,9 +742,9 @@ static bool setSettingValue(SettingId id, int value) {
             if (newVal == (uint8_t)SeasonMode::AUTO) {
                 Display::showToast("SEASON: AUTO 15M", 1400);
             } else {
-                const char* names[] = { "AUTO", "SPRING", "SUMMER", "AUTUMN", "WINTER" };
-                char buf[24];
-                snprintf(buf, sizeof(buf), "SEASON: %s", names[newVal < 5 ? newVal : 0]);
+                const char* names[] = { "AUTO", "SPRING", "SUMMER", "AUTUMN", "WINTER", "RETRO" };
+                char buf[28];
+                snprintf(buf, sizeof(buf), "SEASON: %s", names[newVal < 6 ? newVal : 0]);
                 Display::showToast(buf, 1400);
             }
             return true;
@@ -716,8 +760,9 @@ static bool setSettingValue(SettingId id, int value) {
         }
         case SET_WOLF: {
             bool on = value != 0;
-            if (Config::personality().wolfEnabled == on) return false;
+            if (Config::personality().wolfEnabled == on && SceneLayers::wolf == on) return false;
             Config::personality().wolfEnabled = on;
+            SceneLayers::wolf = on;  // test lab layer follows
             if (!on) Wolf::reset();  // clear any active visit immediately
             Display::showToast(on ? "WOLF: ON" : "WOLF: OFF", 1200);
             return true;
@@ -738,6 +783,72 @@ static bool setSettingValue(SettingId id, int value) {
             if (Config::personality().fruitTreesAmbient == on) return false;
             Config::personality().fruitTreesAmbient = on;
             Display::showToast(on ? "FRUIT TREES: ON" : "FRUIT TREES: OFF", 1200);
+            return true;
+        }
+        // Scene test lab — runtime only (no NVS)
+        case SET_SHOW_PIG: {
+            bool on = value != 0;
+            if (SceneLayers::pig == on) return false;
+            SceneLayers::pig = on;
+            Display::showToast(on ? "PIG: ON" : "PIG: OFF", 900);
+            return true;
+        }
+        case SET_SHOW_GRASS: {
+            bool on = value != 0;
+            if (SceneLayers::grass == on) return false;
+            SceneLayers::grass = on;
+            Display::showToast(on ? "GRASS: ON" : "GRASS: OFF", 900);
+            return true;
+        }
+        case SET_SHOW_TREES: {
+            bool on = value != 0;
+            if (SceneLayers::trees == on) return false;
+            SceneLayers::trees = on;
+            Display::showToast(on ? "TREES: ON" : "TREES: OFF", 900);
+            return true;
+        }
+        case SET_FX_SKY: {
+            bool on = value != 0;
+            if (SceneLayers::sky == on) return false;
+            SceneLayers::sky = on;
+            Display::showToast(on ? "SKY: ON" : "SKY: OFF", 900);
+            return true;
+        }
+        case SET_FX_WEATHER: {
+            bool on = value != 0;
+            if (SceneLayers::weather == on) return false;
+            SceneLayers::weather = on;
+            Display::showToast(on ? "WEATHER: ON" : "WEATHER: OFF", 900);
+            return true;
+        }
+        case SET_FX_SEASON: {
+            bool on = value != 0;
+            if (SceneLayers::seasonFx == on) return false;
+            SceneLayers::seasonFx = on;
+            Display::showToast(on ? "SEASON FX: ON" : "SEASON FX: OFF", 900);
+            return true;
+        }
+        case SET_FX_MOOD: {
+            bool on = value != 0;
+            if (SceneLayers::mood == on) return false;
+            SceneLayers::mood = on;
+            Display::showToast(on ? "MOOD: ON" : "MOOD: OFF", 900);
+            return true;
+        }
+        case SET_CPU_HUD: {
+            bool on = value != 0;
+            if (SceneLayers::cpuHud == on) return false;
+            SceneLayers::cpuHud = on;
+            Display::showToast(on ? "CPU HUD: ON" : "CPU HUD: OFF", 1000);
+            return true;
+        }
+        case SET_SCENE_ALL: {
+            bool on = value != 0;
+            SceneLayers::setAll(on);
+            // Keep wolf personality flag in sync for the layer
+            SceneLayers::wolf = on;
+            if (!on) Wolf::reset();
+            Display::showToast(on ? "ALL LAYERS: ON" : "ALL LAYERS: OFF", 1200);
             return true;
         }
         case SET_BRIGHTNESS: {

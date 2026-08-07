@@ -82,7 +82,8 @@ enum Event {
     WOLF_HIT,           // pig smacks wolf — short yelp
     JUMP,               // pig hop - short rising boing
     ATTACK_HOP,         // pounce / stomp attack
-    RAIN_TICK           // quiet ambient drip (rain) — keep very soft
+    RAIN_TICK,          // quiet ambient drip (rain) — keep very soft
+    IR_FIRE             // IR blaster charge / laser zap (play before mute TX)
 };
 
 // Initialize audio system (call once at startup)
@@ -101,6 +102,10 @@ bool isPlaying();
 
 // Stop current playback and clear queue
 void stop();
+
+// Hard mute (IR bitbang, etc.) — drops all play() until unmuted
+void setMuted(bool muted);
+bool isMuted();
 
 // Direct tone access (for special cases)
 void tone(uint16_t freq, uint16_t duration);

@@ -3,7 +3,9 @@
 #include "trees_drops.h"
 #include "trees.h"
 #include "avatar.h"
+#include "weather.h"
 #include "../ui/display.h"
+#include "../core/config.h"
 #include "../core/xp.h"
 #include <esp_random.h>
 
@@ -145,11 +147,18 @@ static int produceSizeTier(int r) {
     return 1;
 }
 
+static bool isRetroSeason() {
+    return Weather::getActiveSeason() == Season::RETRO;
+}
+
 // Rounded apple — compact only (red was reading as watermelon).
 // color: 0=red, 1=yellow, 2=green (autumn bush)
 static void drawApple(M5Canvas& canvas, int16_t gx, int16_t gy, int tier, int color) {
     uint16_t body, mid, deep, hi;
-    if (color == 1) {
+    if (isRetroSeason()) {
+        // B&W film fruit
+        body = fl(0xAD55); mid = fl(0x8410); deep = fl(0x632C); hi = fl(0xDEFB);
+    } else if (color == 1) {
         body = fl(C_APPLE_YEL); mid = fl(C_APPLE_YEL2); deep = fl(C_APPLE_YEL3); hi = fl(C_APPLE_YEL_H);
     } else if (color == 2) {
         // Soft green apple — muted, harmonizes with autumn canopy (not neon)
@@ -160,8 +169,8 @@ static void drawApple(M5Canvas& canvas, int16_t gx, int16_t gy, int tier, int co
     } else {
         body = fl(C_APPLE_RED); mid = fl(C_APPLE_RED2); deep = fl(C_APPLE_RED3); hi = fl(C_APPLE_RED_H);
     }
-    uint16_t stem = fl(C_STEM);
-    uint16_t leaf = fl(C_LEAF);
+    uint16_t stem = fl(isRetroSeason() ? 0x4208 : C_STEM);
+    uint16_t leaf = fl(isRetroSeason() ? 0x7BEF : C_LEAF);
 
     // Core round apple (always)
     //   .
@@ -183,9 +192,9 @@ static void drawApple(M5Canvas& canvas, int16_t gx, int16_t gy, int tier, int co
 }
 
 static void drawBerry(M5Canvas& canvas, int16_t gx, int16_t gy, int tier) {
-    uint16_t a = fl(C_BERRY);
-    uint16_t b = fl(C_BERRY2);
-    uint16_t h = fl(C_BERRY_H);
+    uint16_t a = fl(isRetroSeason() ? 0x8410 : C_BERRY);
+    uint16_t b = fl(isRetroSeason() ? 0xAD55 : C_BERRY2);
+    uint16_t h = fl(isRetroSeason() ? 0xDEFB : C_BERRY_H);
     if (tier <= 0) {
         // tiny round berry
         cell(canvas, gx, gy,  0, -1, h);
@@ -208,10 +217,10 @@ static void drawBerry(M5Canvas& canvas, int16_t gx, int16_t gy, int tier) {
 
 static void drawAcorn(M5Canvas& canvas, int16_t gx, int16_t gy, int tier) {
     // Bright amber acorn + dark outline so it reads on orange oak leaves
-    uint16_t cap = fl(C_CONE2);
-    uint16_t nut = fl(C_CONE);
-    uint16_t hi  = fl(C_CONE_H);
-    uint16_t out = fl(0x8000);  // dark red-brown rim
+    uint16_t cap = fl(isRetroSeason() ? 0x632C : C_CONE2);
+    uint16_t nut = fl(isRetroSeason() ? 0x9CF3 : C_CONE);
+    uint16_t hi  = fl(isRetroSeason() ? 0xDEFB : C_CONE_H);
+    uint16_t out = fl(isRetroSeason() ? 0x2104 : 0x8000);
     cell(canvas, gx, gy, -1, -1, out);
     cell(canvas, gx, gy,  0, -1, cap);
     cell(canvas, gx, gy,  1, -1, out);
@@ -228,9 +237,9 @@ static void drawAcorn(M5Canvas& canvas, int16_t gx, int16_t gy, int tier) {
 
 static void drawCone(M5Canvas& canvas, int16_t gx, int16_t gy, int tier) {
     // Winter fir cones — brown (tree is dark; snow helps silhouette)
-    uint16_t a = fl(C_FIR_CONE);
-    uint16_t b = fl(C_FIR_CONE2);
-    uint16_t h = fl(C_FIR_CONE_H);
+    uint16_t a = fl(isRetroSeason() ? 0x7BEF : C_FIR_CONE);
+    uint16_t b = fl(isRetroSeason() ? 0x4A49 : C_FIR_CONE2);
+    uint16_t h = fl(isRetroSeason() ? 0xC618 : C_FIR_CONE_H);
     // tapered cone (point up)
     cell(canvas, gx, gy,  0, -2, h);
     cell(canvas, gx, gy, -1, -1, b);
@@ -251,10 +260,10 @@ static void drawCherry(M5Canvas& canvas, int16_t gx, int16_t gy, int tier) {
     //     |
     //    / \
     //   o   o
-    uint16_t body = fl(C_CHERRY);
-    uint16_t deep = fl(C_CHERRY2);
-    uint16_t hi   = fl(C_CHERRY_H);
-    uint16_t stem = fl(C_CHERRY_STEM);
+    uint16_t body = fl(isRetroSeason() ? 0x9CF3 : C_CHERRY);
+    uint16_t deep = fl(isRetroSeason() ? 0x632C : C_CHERRY2);
+    uint16_t hi   = fl(isRetroSeason() ? 0xDEFB : C_CHERRY_H);
+    uint16_t stem = fl(isRetroSeason() ? 0x4208 : C_CHERRY_STEM);
     // stem fork
     cell(canvas, gx, gy,  0, -2, stem);
     cell(canvas, gx, gy, -1, -1, stem);
@@ -374,15 +383,24 @@ void drawDropsForeground(M5Canvas& canvas) {
         int16_t sy = (int16_t)(splashes[i].y + splashes[i].vy * pr * 20 + 40 * pr * pr);
         if (sx < 0 || sx >= DISPLAY_W) continue;
         // Splash tint matches produce (not always red apple)
-        uint16_t col = fl(C_APPLE_RED);
-        switch (splashes[i].produce) {
-            case Produce::YELLOW_APPLE: col = fl(C_APPLE_YEL); break;
-            case Produce::GREEN_APPLE:  col = fl(0x8D40); break;
-            case Produce::CHERRY:       col = fl(C_CHERRY); break;
-            case Produce::ACORN:        col = fl(C_CONE); break;
-            case Produce::CONE:         col = fl(C_FIR_CONE); break;
-            case Produce::BERRY:        col = fl(C_BERRY); break;
-            default: break;
+        uint16_t col = fl(isRetroSeason() ? 0xAD55 : C_APPLE_RED);
+        if (!isRetroSeason()) {
+            switch (splashes[i].produce) {
+                case Produce::YELLOW_APPLE: col = fl(C_APPLE_YEL); break;
+                case Produce::GREEN_APPLE:  col = fl(0x8D40); break;
+                case Produce::CHERRY:       col = fl(C_CHERRY); break;
+                case Produce::ACORN:        col = fl(C_CONE); break;
+                case Produce::CONE:         col = fl(C_FIR_CONE); break;
+                case Produce::BERRY:        col = fl(C_BERRY); break;
+                default: break;
+            }
+        } else {
+            switch (splashes[i].produce) {
+                case Produce::BERRY: col = fl(0x8410); break;
+                case Produce::CONE:
+                case Produce::ACORN: col = fl(0x7BEF); break;
+                default: break;
+            }
         }
         canvas.fillRect(sx, sy, PX, PX, col);
     }

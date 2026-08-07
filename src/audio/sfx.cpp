@@ -444,6 +444,16 @@ static const Note SND_RAIN_TICK[] = {
     {0, 0, 0}
 };
 
+// IR_FIRE: short sci-fi charge + zap (play BEFORE mute / IR bitbang)
+static const Note SND_IR_FIRE[] = {
+    {400, 30, 0},     // charge hum
+    {800, 25, 0},     // rise
+    {1400, 18, 0},    // peak
+    {2200, 22, 0},    // zap
+    {900, 20, 0},     // decay
+    {0, 0, 0}
+};
+
 // ==[ MORSE REMOVED ]==
 // Morse GG was too long (600ms+), replaced with warm resolve in HANDSHAKE
 
@@ -474,6 +484,8 @@ static uint8_t eventVolumeScale(Event e) {
             return 50;
         case ATTACK_HOP:
             return 75;
+        case IR_FIRE:
+            return 80;
         // SCENE (70%) — thunder / wolf present but not full fanfare
         case THUNDER:
         case WOLF:
@@ -504,20 +516,41 @@ static uint8_t currentStep = 0;
 static uint32_t stepStartTime = 0;
 static bool inNote = false;  // true = playing tone, false = in pause
 
-// ==[ EVENT RING BUFFER ]== prevents event loss under rapid fire
-static constexpr uint8_t QUEUE_SIZE = 4;
+// ==[ EVENT RING BUFFER ]== small queue; low-pri sounds do not stack
+static constexpr uint8_t QUEUE_SIZE = 2;
 static Event eventQueue[QUEUE_SIZE];
 static volatile uint8_t queueHead = 0;  // next write position
 static volatile uint8_t queueTail = 0;  // next read position
 static portMUX_TYPE queueMutex = portMUX_INITIALIZER_UNLOCKED;
+static volatile bool s_muted = false;
 
 // ==[ IMPLEMENTATION ]==
+
+static bool isPriorityEvent(Event event) {
+    return event == PMKID || event == HANDSHAKE || event == ACHIEVEMENT ||
+           event == LEVEL_UP || event == JACKPOT_XP || event == ULTRA_STREAK ||
+           event == CHALLENGE_SWEEP || event == CHALLENGE_COMPLETE ||
+           event == YOU_DIED || event == ERROR;
+}
+
+// Ambient / UI spam — never pile on top of an active sequence
+static bool isLowPriorityEvent(Event event) {
+    return event == NETWORK_NEW || event == DEAUTH || event == CLICK ||
+           event == MENU_CLICK || event == TYPING_KEY || event == TERMINAL_TICK ||
+           event == SONAR_PING || event == RADAR_SWEEP || event == SCAN_TICK ||
+           event == RAIN_TICK || event == BIRD_HIT || event == BIRD_IMPACT ||
+           event == JUMP || event == ATTACK_HOP || event == WOLF || event == WOLF_HIT ||
+           event == MODE_ENTER || event == MODE_EXIT || event == BACK_NAV ||
+           event == OINK_HAPPY || event == OINK_GRUNT || event == OINK_CURIOUS ||
+           event == THUNDER;
+}
 
 void init() {
     currentSequence = nullptr;
     currentStep = 0;
     queueHead = 0;
     queueTail = 0;
+    s_muted = false;
     
     // Initialize queue
     for (int i = 0; i < QUEUE_SIZE; i++) {
@@ -525,31 +558,49 @@ void init() {
     }
 }
 
+void setMuted(bool muted) {
+    s_muted = muted;
+    if (muted) stop();
+}
+
+bool isMuted() {
+    return s_muted;
+}
+
 void play(Event event) {
+    if (s_muted) return;
     if (Config::personality().soundLevel == 0) return;
     if (event == NONE) return;
     
     // Priority events (captures/celebrations) interrupt anything else
-    bool isPriority = (event == PMKID || event == HANDSHAKE || event == ACHIEVEMENT || 
-                       event == LEVEL_UP || event == JACKPOT_XP || event == ULTRA_STREAK ||
-                       event == CHALLENGE_SWEEP);
+    bool isPriority = isPriorityEvent(event);
     if (isPriority && currentSequence != nullptr) {
         // Interrupt current sound for priority feedback
         M5.Speaker.stop();
-        delayMicroseconds(100);  // Brief settle time for audio driver stability
+        delayMicroseconds(150);  // settle audio driver before next tone
         currentSequence = nullptr;
         currentStep = 0;
         // Clear queue on priority
         taskENTER_CRITICAL(&queueMutex);
         queueHead = queueTail = 0;
         taskEXIT_CRITICAL(&queueMutex);
+    } else if (isLowPriorityEvent(event)) {
+        // Already playing or queued → drop (stops click/net/rain pile-up)
+        taskENTER_CRITICAL(&queueMutex);
+        bool busy = (currentSequence != nullptr) || (queueTail != queueHead);
+        taskEXIT_CRITICAL(&queueMutex);
+        if (busy) return;
     }
     
     // Enqueue event (ring buffer - drops oldest if full)
     taskENTER_CRITICAL(&queueMutex);
     uint8_t nextHead = (queueHead + 1) % QUEUE_SIZE;
     if (nextHead == queueTail) {
-        // Buffer full - advance tail (drop oldest)
+        // Buffer full - drop *new* low-pri, or drop oldest for priority
+        if (!isPriority) {
+            taskEXIT_CRITICAL(&queueMutex);
+            return;
+        }
         queueTail = (queueTail + 1) % QUEUE_SIZE;
     }
     eventQueue[queueHead] = event;
@@ -558,6 +609,10 @@ void play(Event event) {
 }
 
 static void startSequence(const Note* seq) {
+    // Always stop residual speaker tone so notes never layer / feedback
+    M5.Speaker.stop();
+    delayMicroseconds(80);
+
     currentSequence = seq;
     currentStep = 0;
     stepStartTime = millis();
@@ -573,8 +628,8 @@ static void startSequence(const Note* seq) {
 }
 
 bool update() {
-    // Skip if sound disabled
-    if (Config::personality().soundLevel == 0) {
+    // Skip if muted or sound disabled
+    if (s_muted || Config::personality().soundLevel == 0) {
         // Clear any queued events
         taskENTER_CRITICAL(&queueMutex);
         queueHead = queueTail;
@@ -736,6 +791,9 @@ bool update() {
             case WOLF_HIT:
                 startSequence(SND_WOLF_HIT);
                 break;
+            case IR_FIRE:
+                startSequence(SND_IR_FIRE);
+                break;
             case JUMP:
                 startSequence(SND_JUMP);
                 break;
@@ -786,6 +844,8 @@ bool update() {
                 
                 const Note& next = currentSequence[currentStep];
                 if (next.duration > 0 && next.freq > 0) {
+                    M5.Speaker.stop();
+                    delayMicroseconds(40);
                     M5.Speaker.tone(next.freq, next.duration);
                 }
             }
@@ -800,6 +860,8 @@ bool update() {
             
             const Note& next = currentSequence[currentStep];
             if (next.duration > 0 && next.freq > 0) {
+                M5.Speaker.stop();
+                delayMicroseconds(40);
                 M5.Speaker.tone(next.freq, next.duration);
             }
         }
@@ -825,7 +887,10 @@ void stop() {
 }
 
 void tone(uint16_t freq, uint16_t duration) {
+    if (s_muted) return;
     if (Config::personality().soundLevel == 0) return;
+    // Don't layer direct tones over an active sequence
+    if (currentSequence != nullptr) return;
     applyVolume();
     M5.Speaker.tone(freq, duration);
 }

@@ -69,6 +69,9 @@ public:
 
     // Sparkle particles (achievements, level-up celebrations)
     static void triggerSparkles(uint8_t count = 6);
+    // Full-body continuous sparkles (IR blast aura — pig covered in stars)
+    static void setSparkleStorm(bool on);
+    static bool isSparkleStorm();
 
     // Direction control
     static void setFacingLeft();
@@ -330,7 +333,10 @@ private:
         int8_t vx, vy;
         uint8_t life;       // frames remaining (0 = inactive)
     };
-    static constexpr uint8_t MAX_SPARKLES = 8;
+    static constexpr uint8_t MAX_SPARKLES = 12;
     static SparkleParticle sparkles[MAX_SPARKLES];
+    static bool sparkleStorm;
+    static uint32_t sparkleStormLastMs;
     static void updateAndDrawSparkles(M5Canvas& canvas);
+    static void seedSparkleStorm();
 };

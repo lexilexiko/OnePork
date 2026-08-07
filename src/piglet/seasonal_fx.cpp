@@ -631,6 +631,8 @@ void reset() {
 }
 
 void update() {
+    // RETRO film world: only pixel rain (weather module) — no color FX
+    if (Weather::getActiveSeason() == Season::RETRO) return;
     uint32_t now = millis();
     updateSnowBanks(now);
     updateLeaves(now);
@@ -642,11 +644,13 @@ void update() {
 }
 
 void drawBackdrop(M5Canvas& canvas) {
+    if (Weather::getActiveSeason() == Season::RETRO) return;
     // Sky-layer only (behind tree/pig)
     drawLightningBolts(canvas);
 }
 
 void draw(M5Canvas& canvas) {
+    if (Weather::getActiveSeason() == Season::RETRO) return;
     const bool flash = Weather::isThunderFlashing();
     // Order: ground decor first, then air
     drawSnowBanks(canvas, flash);

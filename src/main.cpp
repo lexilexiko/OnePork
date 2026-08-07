@@ -20,6 +20,7 @@
 #include "gps/gps.h"
 #include "piglet/avatar.h"
 #include "piglet/mood.h"
+#include "piglet/scene_layers.h"
 #include "modes/oink.h"
 #include "modes/warhog.h"
 #include "modes/pigpass.h"
@@ -269,7 +270,8 @@ void loop() {
 
     // Mood + speech bubbles: skip while pig scene is parked (PigPass / TLS / EvilPig)
     // so we don't compete with PBKDF2 / mbedTLS for CPU.
-    if (!Avatar::isSceneSuspended()) {
+    // SceneLayers::mood off also skips monologue CPU for the test lab.
+    if (!Avatar::isSceneSuspended() && SceneLayers::mood) {
         Mood::update();
     }
 

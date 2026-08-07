@@ -774,25 +774,48 @@ void init() {
     Serial.println("[RECON] Initialized");
 }
 
+// Re-reserve after freeNetworks(). BLE must already be released — NimBLE holds
+// ~20-30KB and reserving while BLE is up is the OINK→B→exit hard-reset path.
+// Probe-malloc before vector::reserve: with exceptions off, failed reserve aborts().
+static void reReserveNetworksSafe() {
+    if (networks.capacity() > 0) return;
+
+    size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    // Leave headroom for WiFi driver + stack churn during promisc enable
+    size_t fit = (largest > 8192) ? (largest - 8192) / sizeof(DetectedNetwork) : 0;
+    size_t cap = (fit < MAX_RECON_NETWORKS) ? fit : MAX_RECON_NETWORKS;
+
+    while (cap >= 8) {
+        const size_t bytes = cap * sizeof(DetectedNetwork);
+        void* probe = heap_caps_malloc(bytes, MALLOC_CAP_8BIT);
+        if (probe) {
+            heap_caps_free(probe);
+            networks.reserve(cap);
+            Serial.printf("[RECON] Re-reserved networks cap=%u (largest=%u)\n",
+                          (unsigned)networks.capacity(), (unsigned)largest);
+            return;
+        }
+        cap /= 2;
+    }
+
+    Serial.printf("[RECON] WARNING: no room for networks vector (largest=%u) — "
+                  "recon will track 0 until next free-heap start\n",
+                  (unsigned)largest);
+}
+
 void start() {
     if (!initialized) init();
 
-    // Re-reserve if freeNetworks() dropped capacity to 0.
-    // CRITICAL: reserve(MAX_RECON_NETWORKS) wants ~19KB CONTIGUOUS. With exceptions
-    // disabled, a failed vector allocation calls abort() (hard reset). After a TLS
-    // sync freed/restored the 26KB canvas, the largest block can be < 19KB, so
-    // scale the reserve to what actually fits. A smaller cap just tracks fewer
-    // networks until the next start() re-reserves against a cleaner heap.
-    if (networks.capacity() == 0) {
-        size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-        size_t fit = (largest > 4096) ? (largest - 4096) / sizeof(DetectedNetwork) : 0;
-        size_t cap = (fit < MAX_RECON_NETWORKS) ? fit : MAX_RECON_NETWORKS;
-        if (cap > 0) {
-            networks.reserve(cap);
-        }
-        Serial.printf("[RECON] Re-reserved networks cap=%u (largest=%u)\n",
-                      (unsigned)cap, (unsigned)largest);
-    }
+    // ------------------------------------------------------------------
+    // Radio handoff order (CRITICAL):
+    //   1) Release BLE first  → free ~20-30KB
+    //   2) Re-reserve networks table (~19KB contig)
+    //   3) Enable WiFi promisc
+    // Old order reserved while NimBLE still held buffers → abort after OINK→B.
+    // ------------------------------------------------------------------
+    WiFiUtils::releaseBleStack();
+
+    reReserveNetworksSafe();
 
     if (running) {
         if (paused) {
@@ -813,33 +836,8 @@ void start() {
     for (uint8_t i = 0; i < PENDING_SSID_SLOTS; i++) {
         pendingSsids[i].ready.store(false, std::memory_order_relaxed);
     }
-    
-    // Handle BLE coexistence
-    if (NimBLEDevice::isInitialized()) {
-        Serial.println("[RECON] BLE active - deinitializing for WiFi coexistence");
-        
-        NimBLEScan* pScan = NimBLEDevice::getScan();
-        if (pScan && pScan->isScanning()) {
-            pScan->stop();
-            delay(50);
-        }
-        
-        NimBLEAdvertising* pAdv = NimBLEDevice::getAdvertising();
-        if (pAdv && pAdv->isAdvertising()) {
-            pAdv->stop();
-            delay(50);
-        }
-        
-        NimBLEDevice::deinit(true);
-        delay(100);
-        yield();  // Let deferred FreeRTOS cleanup tasks coalesce freed BLE memory
-        delay(50);
 
-        Serial.printf("[RECON] After BLE deinit: free=%u largest=%u\n",
-                      ESP.getFreeHeap(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-    }
-
-    // Initialize WiFi
+    // Initialize WiFi (driver stays up; never WIFI_OFF here)
     WiFi.persistent(false);
     WiFi.setSleep(false);
     WiFi.mode(WIFI_STA);
@@ -916,22 +914,9 @@ void resume() {
 
     Serial.println("[RECON] Resuming promiscuous mode...");
 
-    // Re-reserve if freeNetworks() dropped capacity to 0.
-    // CRITICAL: reserve(MAX_RECON_NETWORKS) wants ~19KB CONTIGUOUS. With exceptions
-    // disabled, a failed vector allocation calls abort() (hard reset). After a TLS
-    // sync freed/restored the 26KB canvas, the largest block can be < 19KB, so
-    // scale the reserve to what actually fits. A smaller cap just tracks fewer
-    // networks until the next start() re-reserves against a cleaner heap.
-    if (networks.capacity() == 0) {
-        size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-        size_t fit = (largest > 4096) ? (largest - 4096) / sizeof(DetectedNetwork) : 0;
-        size_t cap = (fit < MAX_RECON_NETWORKS) ? fit : MAX_RECON_NETWORKS;
-        if (cap > 0) {
-            networks.reserve(cap);
-        }
-        Serial.printf("[RECON] Re-reserved networks cap=%u (largest=%u)\n",
-                      (unsigned)cap, (unsigned)largest);
-    }
+    // Same rule as start(): never reserve while BLE owns the radio/heap
+    WiFiUtils::releaseBleStack();
+    reReserveNetworksSafe();
 
     // Disconnect from any network before enabling promiscuous mode
     // (WiFi may be connected after TLS operations like WiGLE/WPA-SEC sync)

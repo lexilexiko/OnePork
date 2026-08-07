@@ -28,7 +28,8 @@ uint8_t IrPorkMode::fileSel = 0;
 uint8_t IrPorkMode::fileScroll = 0;
 
 void IrPorkMode::muteAudioForIr() {
-    // IR bitbang + speaker = glitchy piezo; silence until blast ends
+    // IR bitbang + speaker = glitchy piezo / stacked tones
+    SFX::setMuted(true);
     SFX::stop();
     M5.Speaker.stop();
 }
@@ -170,6 +171,8 @@ void IrPorkMode::start() {
     IrPower::setRegion(IR_REGION_NA);
     loadBuiltinPack();
     snprintf(statusMsg, sizeof(statusMsg), "SPC=F1R3  E=F1L3  R=N4/3U");
+    SFX::setMuted(false);
+    SFX::stop();  // clear any stacked ambient from previous mode
     SFX::play(SFX::MODE_ENTER);
     Display::notify(NoticeKind::STATUS, "1RP0RK - P01NT 4T TV", 2200, NoticeChannel::TOP_BAR);
     Avatar::setState(AvatarState::HUNTING);
@@ -181,8 +184,11 @@ void IrPorkMode::stop() {
     running = false;
     phase = Phase::READY;
     digitalWrite(IrPower::IR_TX_PIN, HIGH);
+    SFX::setMuted(false);  // restore audio after IR session
+    SFX::stop();
+    Avatar::setSparkleStorm(false);
     Avatar::setState(AvatarState::NEUTRAL);
-    Avatar::waveRipple(WaveMode::NONE);
+    Avatar::waveRipple(WaveMode::NONE);  // ensure no leftover rings
 }
 
 void IrPorkMode::onHotkeyAgain() {
@@ -208,14 +214,20 @@ void IrPorkMode::startBlast() {
         snprintf(statusMsg, sizeof(statusMsg), "NO CODES");
         return;
     }
-    muteAudioForIr();
+    // One laser-charge SFX before mute — IR bitbang hates the speaker
+    SFX::setMuted(false);
+    SFX::stop();
+    SFX::play(SFX::IR_FIRE);
+
     phase = Phase::BLAST;
     blastIndex = 0;
-    nextSendMs = millis();
+    // Let IR_FIRE finish (~115ms) before TX + mute (smoother, less glitch)
+    nextSendMs = millis() + 280;
     snprintf(statusMsg, sizeof(statusMsg), "FIRING...");
-    Avatar::setState(AvatarState::HUNTING);
-    Avatar::waveRipple(WaveMode::OUTGOING, 4);
-    // Brief hop so the pig "attacks" visibly (no SFX — audio muted)
+    Avatar::setState(AvatarState::EXCITED);
+    Avatar::setSparkleStorm(true);   // whole pig covered in stars
+    Avatar::setGrassMoving(false);   // free CPU during IR TX
+    Avatar::waveRipple(WaveMode::NONE);  // no radio-ring anim in IR
     Avatar::setManualWalk(false);
 }
 
@@ -237,7 +249,9 @@ void IrPorkMode::handleInput() {
             phase = Phase::DONE;
             snprintf(statusMsg, sizeof(statusMsg), "STOP %u/%u",
                      (unsigned)blastIndex, (unsigned)blastTotal);
+            Avatar::setSparkleStorm(false);
             Avatar::waveRipple(WaveMode::NONE);
+            SFX::setMuted(false);
             return;
         }
         stop();
@@ -295,7 +309,9 @@ void IrPorkMode::handleInput() {
             phase = Phase::DONE;
             snprintf(statusMsg, sizeof(statusMsg), "STOP %u/%u",
                      (unsigned)blastIndex, (unsigned)blastTotal);
+            Avatar::setSparkleStorm(false);
             Avatar::waveRipple(WaveMode::NONE);
+            SFX::setMuted(false);
         }
         return;
     }
@@ -347,19 +363,23 @@ void IrPorkMode::update() {
         phase = Phase::DONE;
         snprintf(statusMsg, sizeof(statusMsg), "DONE %u CODES", (unsigned)blastTotal);
         Avatar::waveRipple(WaveMode::NONE);
+        Avatar::setSparkleStorm(false);
         Avatar::setState(AvatarState::HAPPY);
-        Avatar::triggerSparkles(8);
+        Avatar::triggerSparkles(10);  // final star burst
         // Safe to beep again after IR TX finished
+        SFX::setMuted(false);
+        SFX::stop();
         SFX::play(SFX::CONFIRM);
         return;
     }
 
-    // Keep speaker quiet every shot (bitbang is interrupt-heavy)
+    // Keep speaker fully muted every shot (bitbang + SFX = foul noise)
     muteAudioForIr();
 
     if (pack == Pack::BUILTIN) {
         IrPower::sendCode(blastIndex);
-        nextSendMs = millis() + 20;
+        // Slightly longer gap → less frame-skip feel + speaker settle
+        nextSendMs = millis() + 28;
     } else {
         const Code& c = codes[blastIndex];
         switch (c.proto) {
@@ -371,13 +391,9 @@ void IrPorkMode::update() {
         nextSendMs = millis() + 100;
     }
 
-    // Visual attack feedback only (no SFX)
-    if ((blastIndex % 3) == 0) {
-        Avatar::waveRipple(WaveMode::OUTGOING, 4);
-        Avatar::triggerSparkles(2);
-    }
-    if ((blastIndex % 8) == 0)
-        Avatar::setState(AvatarState::HUNTING);
+    // Stars only — no circular wave/signal rings (looks wrong in IR)
+    if ((blastIndex % 12) == 0)
+        Avatar::setState(AvatarState::EXCITED);
 
     blastIndex++;
 }

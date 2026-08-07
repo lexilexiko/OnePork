@@ -125,10 +125,10 @@ struct PersonalityConfig {
     // Sky / time-of-day for avatar scene (replaces color themes)
     // 0 = AUTO (RTC or synthetic cycle), 1 = always DAY, 2 = always NIGHT
     uint8_t skyMode = 0;
-    // Avatar pig skin: 0=CLASSIC 1=BLUSH 2=HOG 3=ZOMBIE
+    // Avatar pig skin: 0=CLASSIC 1=BLUSH 2=HOG 3=ZOMBIE 4=RETRO (B&W film)
     uint8_t pigSkin = 0;
-    // Season: 0=AUTO (cycle ~15 min) 1=SPRING 2=SUMMER 3=AUTUMN 4=WINTER
-    // Drives grass palette + precip (rain/snow/leaves/storms)
+    // Season: 0=AUTO (~15 min) 1=SPRING 2=SUMMER 3=AUTUMN 4=WINTER 5=RETRO
+    // RETRO = monochrome old-film scene + falling pixels (manual only, not in AUTO)
     uint8_t seasonMode = 0;  // AUTO default
     // Avatar animation lab: - / = cycle emotions+FX when IDLE
     bool animTest = false;
@@ -151,22 +151,25 @@ enum class SkyMode : uint8_t {
     NIGHT = 2
 };
 
-static const uint8_t PIG_SKIN_COUNT = 4;
+static const uint8_t PIG_SKIN_COUNT = 5;
 enum class PigSkin : uint8_t {
     CLASSIC = 0,  // candy pink, soft smile
     BLUSH   = 1,  // hotter pink, big smile
     HOG     = 2,  // warmer rose, tougher snout
-    ZOMBIE  = 3   // bony undead green-gray
+    ZOMBIE  = 3,  // bony undead green-gray
+    RETRO   = 4   // silver-screen B&W film pig
 };
 
 // Season picker (settings). AUTO rotates SPRING→SUMMER→AUTUMN→WINTER every 15 min.
-static const uint8_t SEASON_MODE_COUNT = 5;
+// RETRO is manual-only (old film world: B&W + pixel rain).
+static const uint8_t SEASON_MODE_COUNT = 6;
 enum class SeasonMode : uint8_t {
     AUTO   = 0,
     SPRING = 1,
     SUMMER = 2,
     AUTUMN = 3,
-    WINTER = 4
+    WINTER = 4,
+    RETRO  = 5
 };
 
 // Active calendar season (never AUTO) — used by grass + weather FX
@@ -174,8 +177,10 @@ enum class Season : uint8_t {
     SPRING = 0,
     SUMMER = 1,
     AUTUMN = 2,
-    WINTER = 3
+    WINTER = 3,
+    RETRO  = 4   // monochrome pixel world
 };
+// AUTO cycle only walks the four real seasons (not RETRO)
 static const uint8_t SEASON_COUNT = 4;
 
 // JanusHog coprocessor settings (JANUS HOG)

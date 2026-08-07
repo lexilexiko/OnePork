@@ -1,8 +1,8 @@
 # One Pork — fan build notes
 
-**Version: v0.1.8c (1.4.1)**  
+**Version: v0.1.8c (1.4.5)**  
 - `0.1.8c` — last known upstream M5PORKCHOP base  
-- `(1.4.1)` — One Pork fan package revision
+- `(1.4.5)` — One Pork fan package revision
 
 This tree is a **fan / community packaging** of **M5PORKCHOP**.
 
@@ -44,7 +44,33 @@ License: MIT — Copyright (c) 2025 **0ct0** (`LICENSE`).
 
 ---
 
-## v1.4 / 1.4.1 changelog
+## v1.4.5 changelog (latest)
+
+### New
+
+- **RETRO season + pig skin** — black & white film world (pixel rain, mono trees/bushes/bars/clouds)
+- **SCENE lab** (settings) — toggle sky / grass / trees / pig / weather / season FX / mood / wolf
+- **CPU HUD** — frame load % + ms in top bar free slot (lab only)
+- IR **sparkle-storm** anim + **IR_FIRE** SFX (no radio-ring waves)
+- Wolf only on **IDLE** / **Fruit Run** (not O/W/B/D work modes)
+- SFX layering: low-priority drop, IR mute during TX
+
+### Fixed
+
+- **[B] BLUES** hard-reset on **exit after OINK**  
+  - Root cause: `NetworkRecon` re-reserved ~19KB table while NimBLE still held ~20–30KB  
+  - With exceptions off, failed `vector::reserve` → `abort()` → reboot  
+  - Fix: **`WiFiUtils::releaseBleStack()` first**, then probe-safe re-reserve, then promisc  
+  - Same handoff used on BLUES stop, recon start/resume, charging
+- CPU HUD no longer crowded on bottom bar
+
+### From 1.4 / 1.4.1 (still in tree)
+
+- 1RP0RK, Fruit Run, RANK/GR1ND, fan XP + ST4TS, seasons, EvilPig portal fix, cold-start BLUES freeNetworks
+
+---
+
+## v1.4 / 1.4.1 changelog (history)
 
 ### New (1.4)
 
@@ -82,15 +108,16 @@ License: MIT — Copyright (c) 2025 **0ct0** (`LICENSE`).
 ### Scene / piglet
 
 - Multi-kind **trees** (`trees` + `trees_drops`) — fruit / decor / berry
-- Seasonal trees: spring **cherry**, summer **apple**, autumn **old apple**, winter **fir**
+- Seasonal trees: spring **cherry**, summer **apple**, autumn **old apple**, winter **fir**, **RETRO** mono film trees
 - Seasonal produce: cherries, red apples, green apples, cones, berries
 - Fallen fruit scrolls with the world + foreground drops
-- **Wolf** visitor: chase, bite, sit = peaceful pass-by, stomp/scare
-- Seasonal FX: snow banks + **trample path**, autumn leaves + tumbleweed, summer butterflies + pollen, spring lightning
-- Quiet **RAIN_TICK** SFX; **WOLF_HIT** yelp
+- **Wolf** visitor: chase, bite, sit = peaceful pass-by, stomp/scare (IDLE / Fruit Run only)
+- Seasonal FX: snow banks + **trample path**, autumn leaves + tumbleweed, summer butterflies + pollen, spring lightning, **RETRO pixel rain**
+- Quiet **RAIN_TICK** SFX; **WOLF_HIT** yelp; **IR_FIRE**
 - Monologue bubble: **5s on screen → gone → 15s silence → next line**
 - Free-roam walk / jump / sit / play-dead on IDLE
 - Scene **suspend** during PigPass / EvilPig / Xfer / WPA-SEC / WiGLE
+- **SceneLayers** test lab + CPU HUD (runtime toggles, not NVS)
 
 ### Modes
 
@@ -101,7 +128,7 @@ License: MIT — Copyright (c) 2025 **0ct0** (`LICENSE`).
 | **S** / RANK→FLEXES | Flexes | LVL, XP, ST4TS / B00ST / **GR1ND** / W1GL3 |
 | RANK→**DEMANDS** | Challenges | Same as hotkey **1** — session trials + XP |
 | RANK→BADGES / UNLOCK | Achievements / unlockables | Street cred |
-| **B** / ATTACK→BLUES | Piggy Blues | BLE spam; radio handoff frees recon table |
+| **B** / ATTACK→BLUES | Piggy Blues | BLE spam; radio handoff frees recon table + BLE release on exit |
 
 ### Menus (RPG map)
 
@@ -142,7 +169,7 @@ In 1RP0RK: **E** = pick file, **SPC** = fire, **R** = N4/EU region, **B** = buil
 
 Prebuilt binary (when shipped):
 
-- `releases/OnePork_v0.1.8c-1.4.1_m5cardputer_firmware.bin`
+- `releases/OnePork_v0.1.8c-1.4.5_m5cardputer_firmware.bin`
 
 Flash with M5 Launcher / M5Burner / `esptool`.  
 XP is kept if you update via M5 Launcher (do not wipe NVS).

@@ -20,6 +20,7 @@
 #include "../piglet/weather.h"
 #include "../piglet/seasonal_fx.h"
 #include "../piglet/wolf.h"
+#include "../piglet/scene_layers.h"
 #include "../modes/oink.h"
 #include "../modes/do_no_ham.h"
 #include "../modes/warhog.h"
@@ -54,11 +55,14 @@
 #include "../core/janus_hog.h"
 
 // Fixed colorful UI (color themes removed — use SKY mode for day/night instead)
+// RETRO season forces old-film monochrome for the whole scene (bars + main).
 uint16_t getColorFG() {
+    if (Weather::getActiveSeason() == Season::RETRO) return 0xE73C;  // light gray
     return UiStyle::TEXT;   // warm cream on slate
 }
 
 uint16_t getColorBG() {
+    if (Weather::getActiveSeason() == Season::RETRO) return 0x1082;  // near-black gray
     return UiStyle::BG;     // deep slate
 }
 
@@ -266,6 +270,8 @@ uint8_t* Display::mainCanvasBuffer() { return s_mainCanvasBuf; }
 size_t   Display::mainCanvasBufferSize() { return kMainCanvasBytes; }
 
 void Display::update() {
+    SceneLayers::beginFrame();
+
     // Apply any pending top-bar message requests from worker tasks
     char pendingMsg[96];
     uint32_t pendingDuration = 0;
@@ -310,14 +316,34 @@ void Display::update() {
     // Weather first so top-bar cloud bleed + thunder flash match this frame.
     // When scene is suspended (PigPass / EvilPig / WPA-SEC / WiGLE / Xfer), park
     // weather/wolf ticks entirely — frees CPU for crypto/TLS.
+    // Wolf only on free roam (IDLE) or Fruit Run — not during O/W/B/D/I/etc.
+    // SceneLayers toggles skip work for CPU lab testing.
     const bool sceneLive = useAvatarWeather && !Avatar::isSceneSuspended();
+    const bool wolfLive = sceneLive && SceneLayers::wolf &&
+        (mode == PorkchopMode::IDLE || mode == PorkchopMode::FRUIT_RUN_MODE);
+    // IR blast is bitbang-heavy — skip weather/season ticks so frames don't stutter
+    const bool irLite = (mode == PorkchopMode::IR_PORK_MODE && IrPorkMode::isBlasting());
     if (sceneLive) {
-        Weather::setMoodLevel(Mood::getEffectiveHappiness());
-        Weather::update();
-        SeasonalFx::update();
-        Wolf::update();
-        Avatar::setThunderFlash(Weather::isThunderFlashing());
+        if (!irLite && SceneLayers::weather) {
+            Weather::setMoodLevel(Mood::getEffectiveHappiness());
+            Weather::update();
+            Avatar::setThunderFlash(Weather::isThunderFlashing());
+        } else if (!irLite && SceneLayers::sky) {
+            // Sky-only still needs a stable thunder flag
+            Avatar::setThunderFlash(false);
+        } else {
+            Avatar::setThunderFlash(false);
+        }
+        if (!irLite && SceneLayers::seasonFx) {
+            SeasonalFx::update();
+        }
+        if (wolfLive) {
+            Wolf::update();
+        } else if (Wolf::isActive()) {
+            Wolf::reset();  // kill mid-chase if user entered a work mode
+        }
     } else {
+        if (Wolf::isActive()) Wolf::reset();
         Avatar::setThunderFlash(false);
     }
 
@@ -346,11 +372,17 @@ void Display::update() {
             if (sceneLive) {
                 // Clouds drawn inside Avatar::drawFrame (behind tree/pig)
                 Avatar::draw(mainCanvas);
-                Wolf::draw(mainCanvas);             // visitor chase (own module)
-                Weather::drawBirds(mainCanvas, fg);
-                Weather::draw(mainCanvas, fg, bg);  // rain / snow / wind
-                SeasonalFx::draw(mainCanvas);       // banks, leaves, tumbleweed, butterflies
-                Mood::draw(mainCanvas);
+                if (wolfLive) Wolf::draw(mainCanvas);  // free-roam visitor only
+                if (SceneLayers::weather) {
+                    Weather::drawBirds(mainCanvas, fg);
+                    Weather::draw(mainCanvas, fg, bg);  // rain / snow / wind
+                }
+                if (SceneLayers::seasonFx) {
+                    SeasonalFx::draw(mainCanvas);       // banks, leaves, tumbleweed, butterflies
+                }
+                if (SceneLayers::mood) {
+                    Mood::draw(mainCanvas);
+                }
             }
             break;
 
@@ -358,13 +390,19 @@ void Display::update() {
         case PorkchopMode::DNH_MODE:
         case PorkchopMode::WARHOG_MODE:
         case PorkchopMode::PIGGYBLUES_MODE:
+            // Work modes: no wolf — pig is busy (no chase on the job)
             if (sceneLive) {
                 Avatar::draw(mainCanvas);
-                Wolf::draw(mainCanvas);
-                Weather::drawBirds(mainCanvas, fg);
-                Weather::draw(mainCanvas, fg, bg);
-                SeasonalFx::draw(mainCanvas);
-                Mood::draw(mainCanvas);
+                if (SceneLayers::weather) {
+                    Weather::drawBirds(mainCanvas, fg);
+                    Weather::draw(mainCanvas, fg, bg);
+                }
+                if (SceneLayers::seasonFx) {
+                    SeasonalFx::draw(mainCanvas);
+                }
+                if (SceneLayers::mood) {
+                    Mood::draw(mainCanvas);
+                }
             }
             break;
 
@@ -630,6 +668,7 @@ void Display::update() {
         drawBottomBar();
     }
     pushAll();
+    SceneLayers::endFrame();
 
     // Frame pacing: yield unused CPU time to RTOS scheduler.
     // Spectrum mode runs uncapped for smooth sinc animation; all other modes target ~30 FPS.
@@ -782,19 +821,26 @@ void Display::drawTopBar() {
          mode == PorkchopMode::PIGGYBLUES_MODE || mode == PorkchopMode::BACON_MODE ||
          mode == PorkchopMode::MICPORK_MODE || mode == PorkchopMode::FRUIT_RUN_MODE ||
          mode == PorkchopMode::IR_PORK_MODE);
-    // Flash white with thunder so bar doesn't stay a hard cut line
+    // Flash white with thunder so bar doesn't stay a hard cut line.
+    // RETRO: force film B&W text (cream cream looks wrong on gray sky).
+    const bool retro = (Weather::getActiveSeason() == Season::RETRO);
     const uint16_t barBg = avatarScene
         ? (Weather::isThunderFlashing() ? (uint16_t)0xFFFF : Avatar::getSkyColor())
         : bg;
     const uint16_t barFg = avatarScene
-        ? (Weather::isThunderFlashing() ? (uint16_t)0x2104 : (uint16_t)0xEF5D)
+        ? (Weather::isThunderFlashing() ? (uint16_t)0x2104
+           : (retro ? (uint16_t)0xE73C : (uint16_t)0xEF5D))
         : fg;
 
     topBar.fillSprite(barBg);
     // Cloud / tree crown tops continue into the bar. Text draws after (on top).
     if (avatarScene) {
-        Weather::drawClouds(topBar, barFg, (int16_t)TOP_BAR_H);
-        Avatar::drawTreeBarOverflow(topBar);
+        if (SceneLayers::weather) {
+            Weather::drawClouds(topBar, barFg, (int16_t)TOP_BAR_H);
+        }
+        if (SceneLayers::trees) {
+            Avatar::drawTreeBarOverflow(topBar);
+        }
     }
     topBar.setTextColor(barFg);
     topBar.setTextSize(1);
@@ -973,9 +1019,19 @@ void Display::drawTopBar() {
     char rightBuf[32];
     snprintf(rightBuf, sizeof(rightBuf), "%d%% %s %s", battLevel, statusBuf, timeBuf);
     int rightWidth = topBar.textWidth(rightBuf);
-    
-    // Truncate left string if it would overlap right side
-    int maxLeftWidth = DISPLAY_W - rightWidth - 8;  // 8px margin
+
+    // CPU HUD sits in the free gap left of battery/status (test lab)
+    char cpuBuf[20];
+    int cpuWidth = 0;
+    if (SceneLayers::cpuHud) {
+        snprintf(cpuBuf, sizeof(cpuBuf), "CPU%u%% %ums",
+                 (unsigned)SceneLayers::getCpuPct(),
+                 (unsigned)SceneLayers::getFrameMs());
+        cpuWidth = topBar.textWidth(cpuBuf) + 6;  // gap before right cluster
+    }
+
+    // Truncate left string if it would overlap right side / CPU
+    int maxLeftWidth = DISPLAY_W - rightWidth - 8 - cpuWidth;
     char leftBuf[80];
     strncpy(leftBuf, finalModeBuf, sizeof(leftBuf) - 1);
     leftBuf[sizeof(leftBuf) - 1] = '\0';
@@ -987,7 +1043,7 @@ void Display::drawTopBar() {
         leftBuf[leftLen - 2] = '.';
         leftBuf[leftLen - 1] = '.';
     }
-    
+
     topBar.setTextColor(modeColor);
     topBar.setTextDatum(top_left);
     topBar.drawString(leftBuf, 2, 2);
@@ -996,6 +1052,14 @@ void Display::drawTopBar() {
     topBar.setTextColor(barFg);
     topBar.setTextDatum(top_right);
     topBar.drawString(rightBuf, DISPLAY_W - 2, 2);
+
+    // CPU load in the free middle-right slot (gold, doesn't fight battery)
+    if (SceneLayers::cpuHud) {
+        topBar.setTextColor(0xFFE0);  // gold so it pops on sky/bg
+        topBar.setTextDatum(top_right);
+        topBar.drawString(cpuBuf, DISPLAY_W - 2 - rightWidth - 6, 2);
+        topBar.setTextDatum(top_left);
+    }
 }
 
 void Display::drawTopBarMessageTwoLineDirect(int offsetX, int offsetY) {
@@ -1058,6 +1122,8 @@ void Display::drawBottomBar() {
     uint16_t DIRT_DARK = 0x5140;
     uint16_t DIRT_LITE = 0xA3E0;
     uint16_t fringeTop = 0x45A0;  // summer grass default
+    uint16_t TEXT_COL  = 0xEF5D;  // cream readable on dirt
+    uint16_t TEXT_DIM  = 0xC618;
     switch (season) {
         case Season::SPRING:
             fringeTop = 0x8F20;  // lime young-shoot (match spring turf)
@@ -1076,9 +1142,16 @@ void Display::drawBottomBar() {
             DIRT_DARK = 0x4208;
             DIRT_LITE = 0xC618;
             break;
+        case Season::RETRO:
+            // Old-film B&W strip (matches mono dirt/grass scene)
+            fringeTop = 0x9CF3;
+            DIRT_MID  = 0x4208;
+            DIRT_DARK = 0x2104;
+            DIRT_LITE = 0x8410;
+            TEXT_COL  = 0xE73C;
+            TEXT_DIM  = 0xAD55;
+            break;
     }
-    const uint16_t TEXT_COL  = 0xEF5D;  // cream readable on dirt
-    const uint16_t TEXT_DIM  = 0xC618;
 
     PorkchopMode mode = porkchop.getMode();
     (void)mode;
@@ -1096,6 +1169,13 @@ void Display::drawBottomBar() {
     } else if (season == Season::AUTUMN) {
         for (int x = 0; x < DISPLAY_W; x += 4) {
             if (((x * 3) & 5) == 0) bottomBar.drawPixel(x, 0, 0xD280);
+        }
+    } else if (season == Season::RETRO) {
+        // Film-grain dust on the lip
+        for (int x = 0; x < DISPLAY_W; x += 3) {
+            uint32_t h = (uint32_t)x * 1103515245u;
+            if ((h & 3) != 0) bottomBar.drawPixel(x, 0, 0xC618);
+            if ((h & 7) == 0) bottomBar.drawPixel(x + 1, 1, 0xFFFF);
         }
     }
     bottomBar.fillRect(0, BOTTOM_BAR_H - 3, DISPLAY_W, 3, DIRT_DARK);
@@ -1643,7 +1723,7 @@ void Display::showBootSplash() {
 
     M5.Display.setTextSize(1);
     M5.Display.drawString("F4N BU1LD 0F M5P0RKCH0P", DISPLAY_W / 2, DISPLAY_H / 2 + 12);
-    M5.Display.drawString("v0.1.8c (1.4.1) 0N3 P0RK", DISPLAY_W / 2, DISPLAY_H / 2 + 24);
+    M5.Display.drawString("v0.1.8c (1.4.5) 0N3 P0RK", DISPLAY_W / 2, DISPLAY_H / 2 + 24);
     M5.Display.drawString("D0N4T3 0ct0. FL3X L3X1.", DISPLAY_W / 2, DISPLAY_H / 2 + 36);
 
     bootSplashDelay(700);
@@ -3105,7 +3185,7 @@ void Display::drawAboutScreen(M5Canvas& canvas) {
     
     canvas.setTextSize(1);
     canvas.setTextColor(UiStyle::CYAN);
-    canvas.drawString("v0.1.8c (1.4.1)", DISPLAY_W / 2, 20);
+    canvas.drawString("v0.1.8c (1.4.5)", DISPLAY_W / 2, 20);
 
     // Upstream creator first (always)
     canvas.setTextColor(COLOR_FG);

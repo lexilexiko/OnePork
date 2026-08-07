@@ -517,7 +517,7 @@ void BaconMode::draw(M5Canvas& canvas) {
     // === STANDARD LAYOUT: Avatar + Mood (XP shows in top bar on gain) ===
     // Clouds drawn inside Avatar (behind tree); rain/birds on top
     Avatar::draw(canvas);
-    Wolf::draw(canvas);
+    // No wolf in work modes (only IDLE / Fruit Run)
     Mood::draw(canvas);
     Weather::drawBirds(canvas, COLOR_FG);
     Weather::draw(canvas, COLOR_FG, COLOR_BG);

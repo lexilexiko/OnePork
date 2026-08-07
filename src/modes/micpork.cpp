@@ -296,7 +296,7 @@ void MicPorkMode::draw(M5Canvas& canvas) {
     // Scene + pig only (no spectrum bar UI — pig is the meter)
     // Clouds drawn inside Avatar (behind tree); rain/birds on top
     Avatar::draw(canvas);
-    Wolf::draw(canvas);
+    // No wolf in work modes (only IDLE / Fruit Run)
     Weather::drawBirds(canvas, COLOR_FG);
     Weather::draw(canvas, COLOR_FG, COLOR_BG);
     SeasonalFx::draw(canvas);

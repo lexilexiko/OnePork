@@ -594,17 +594,12 @@ void PiggyBluesMode::stop() {
         pAdvertising->stop();
         delay(BLE_OP_DELAY_MS);
     }
-    // Keep pAdvertising pointer - we'll reuse it on restart
-    
-    // Give BLE stack time to settle
+    pAdvertising = nullptr;  // invalid after releaseBleStack / deinit
     delay(BLE_STACK_SETTLE_MS);
-    
-    // DON'T call deinit - ESP32-S3 has issues reinitializing BLE after deinit
-    // Just keep BLE initialized but idle
-    
+
     running = false;
     targets.clear();
-    targets.shrink_to_fit();  // FIX: Release vector capacity to recover heap
+    targets.shrink_to_fit();  // Release vector capacity to recover heap
     activeCount = 0;
     setAdvertisingNow(false);
     
@@ -618,11 +613,17 @@ void PiggyBluesMode::stop() {
     XP::addRouletteWin();  // keep counter for stats/achievements
     XP::addXPSilent(EXIT_XP_BONUS);
 
-    // Restore WiFi after BLE exclusive use in start()
+    // Exclusive radio handoff back to WiFi recon:
+    //   BLE deinit FIRST (frees ~20-30KB) → then NetworkRecon re-reserves table.
+    // Leaving BLE "idle" and reserving inside start() was the OINK→B→exit reboot
+    // (vector::reserve aborts when contig heap is still held by NimBLE).
+    WiFiUtils::releaseBleStack();
+    advCachePrimed = false;  // cache held NimBLE objects; rebuild on next start
+
     WiFi.mode(WIFI_STA);
     delay(HeapPolicy::kWiFiModeDelayMs);
 
-    // Background recon for OINK / other WiFi modes
+    // Background recon for OINK / SPECTRUM / IDLE
     NetworkRecon::start();
 }
 

@@ -2,6 +2,7 @@
 
 #include "avatar.h"
 #include "weather.h"
+#include "scene_layers.h"
 #include "seasonal_fx.h"
 #include "trees.h"
 #include "wolf.h"
@@ -98,6 +99,8 @@ uint32_t Avatar::nextEarTwitch = 0;
 
 // Sparkle particle pool
 Avatar::SparkleParticle Avatar::sparkles[MAX_SPARKLES] = {};
+bool Avatar::sparkleStorm = false;
+uint32_t Avatar::sparkleStormLastMs = 0;
 
 // Event reaction animation states
 bool Avatar::perkUpActive = false;
@@ -482,6 +485,16 @@ static void drawSkyBackdrop(M5Canvas& canvas) {
     uint16_t S1 = wetMix(band(CD1, CK1, CN1), band(RD1, RK1, RN1), band(SD1, SK1, SN1));
     uint16_t S2 = wetMix(band(CD2, CK2, CN2), band(RD2, RK2, RN2), band(SD2, SK2, SN2));
     uint16_t S3 = wetMix(band(CD3, CK3, CN3), band(RD3, RK3, RN3), band(SD3, SK3, SN3));
+
+    // RETRO season: force old-film grayscale sky (no blue/pink day tones)
+    if (Weather::getActiveSeason() == Season::RETRO) {
+        // dark charcoal → mid gray gradient
+        S0 = 0x18C3; S1 = 0x3186; S2 = 0x4A69; S3 = 0x632C;
+        if (wd > 0) {
+            // wet/storm slightly darker
+            S0 = 0x10A2; S1 = 0x2104; S2 = 0x39C7; S3 = 0x52AA;
+        }
+    }
     s_skyTop = S0;
 
     static const uint8_t bayer4[16] = {
@@ -602,6 +615,8 @@ static const PigPalette kPigPalettes[PIG_SKIN_COUNT] = {
     { 0xE28A, 0xFDB7, 0xFEDF, 0xE30C, 0xFC94, 0xFB12, 0x9B48, 0x5986, 0xFFFF, 0xC24A, 0xE28A, 0xF9AE },
     { 0xC208, 0xE34D, 0xFDB5, 0xB1E6, 0xD28A, 0xCA28, 0x6A46, 0x40C3, 0xFFFF, 0x8944, 0xA165, 0xE28C },
     { 0x3A08, 0x6B8C, 0x9D34, 0x4A69, 0x7BF0, 0x5AEB, 0x2DE4, 0xF800, 0x5FEA, 0x3205, 0x6B4D, 0x4A8A },
+    // RETRO — silver-screen grayscale (old film pig)
+    { 0x3186, 0xAD55, 0xC618, 0x7BEF, 0x9CF3, 0x8410, 0x632C, 0x0000, 0xFFFF, 0x4208, 0x2104, 0xBDF7 },
 };
 static const PigPalette& activePigPalette() {
     uint8_t s = Config::personality().pigSkin;
@@ -1214,7 +1229,7 @@ void Avatar::triggerTailWiggle() {
 void Avatar::triggerSparkles(uint8_t count) {
     // Burst spawn sparkles from pig body center
     int cx = currentX + (PIG_LAYOUT_W * PX) / 2;
-    int cy = (106 - PIG_LAYOUT_H * PX) + (PIG_LAYOUT_H * PX) / 2;
+    int cy = (106 - PIG_LAYOUT_H * PX) + (PIG_LAYOUT_H * PX) / 2 - getJumpLiftPx();
     for (uint8_t i = 0; i < MAX_SPARKLES && count > 0; i++) {
         if (sparkles[i].life == 0) {
             sparkles[i].x = cx + random(-10, 11);
@@ -1227,8 +1242,47 @@ void Avatar::triggerSparkles(uint8_t count) {
     }
 }
 
+void Avatar::setSparkleStorm(bool on) {
+    sparkleStorm = on;
+    sparkleStormLastMs = 0;
+    if (!on) {
+        for (uint8_t i = 0; i < MAX_SPARKLES; i++) sparkles[i].life = 0;
+    } else {
+        seedSparkleStorm();
+    }
+}
+
+bool Avatar::isSparkleStorm() {
+    return sparkleStorm;
+}
+
+void Avatar::seedSparkleStorm() {
+    // Cover whole pig body with stars (wider than normal burst)
+    int cx = currentX + (PIG_LAYOUT_W * PX) / 2;
+    int cy = (106 - PIG_LAYOUT_H * PX) + (PIG_LAYOUT_H * PX) / 2 - getJumpLiftPx();
+    for (uint8_t i = 0; i < MAX_SPARKLES; i++) {
+        if (sparkles[i].life != 0) continue;
+        // Full body spread — snout to tail, feet to ears
+        sparkles[i].x = cx + random(-22, 23);
+        sparkles[i].y = cy + random(-24, 18);
+        sparkles[i].vx = random(-2, 3);
+        sparkles[i].vy = random(-3, 2);
+        sparkles[i].life = random(8, 16);
+    }
+}
+
 void Avatar::updateAndDrawSparkles(M5Canvas& canvas) {
+    // Continuous full-body star aura (IR fire mode)
+    if (sparkleStorm) {
+        uint32_t now = millis();
+        if (now - sparkleStormLastMs >= 45) {
+            sparkleStormLastMs = now;
+            seedSparkleStorm();
+        }
+    }
+
     uint16_t col = maybeFlash(C_SPARK);
+    uint16_t colGold = maybeFlash(0xFFE0);  // gold accents in storm
     for (uint8_t i = 0; i < MAX_SPARKLES; i++) {
         if (sparkles[i].life == 0) continue;
         sparkles[i].x += sparkles[i].vx;
@@ -1236,14 +1290,15 @@ void Avatar::updateAndDrawSparkles(M5Canvas& canvas) {
         sparkles[i].life--;
         int16_t sx = snapPx(sparkles[i].x);
         int16_t sy = snapPx(sparkles[i].y);
+        uint16_t c = (sparkleStorm && ((i + sparkles[i].life) & 1)) ? colGold : col;
         if (sparkles[i].life > 6) {
-            canvas.fillRect(sx, sy, PX, PX, col);
-            canvas.fillRect(sx - PX, sy, PX, PX, col);
-            canvas.fillRect(sx + PX, sy, PX, PX, col);
-            canvas.fillRect(sx, sy - PX, PX, PX, col);
-            canvas.fillRect(sx, sy + PX, PX, PX, col);
+            canvas.fillRect(sx, sy, PX, PX, c);
+            canvas.fillRect(sx - PX, sy, PX, PX, c);
+            canvas.fillRect(sx + PX, sy, PX, PX, c);
+            canvas.fillRect(sx, sy - PX, PX, PX, c);
+            canvas.fillRect(sx, sy + PX, PX, PX, c);
         } else {
-            canvas.fillRect(sx, sy, PX, PX, col);
+            canvas.fillRect(sx, sy, PX, PX, c);
         }
     }
 }
@@ -1530,13 +1585,24 @@ void Avatar::drawFrame(M5Canvas& canvas, bool blink, bool faceRight, bool sniff)
     // Z-order (back → front):
     //   sky → stars/moon → clouds → season backdrop (lightning) → tree → pig → grass
     // Clouds MUST be before the tree (were drawn after Avatar in Display → tree behind clouds).
-    drawSkyBackdrop(canvas);
-    updateStars();
-    drawStars(canvas);
-    Weather::drawClouds(canvas, getDrawColor());
-    SeasonalFx::drawBackdrop(canvas);  // spring bolts sit in the sky
+    // SceneLayers test lab can skip pieces for CPU profiling.
+    if (SceneLayers::sky) {
+        drawSkyBackdrop(canvas);
+        updateStars();
+        drawStars(canvas);
+    } else {
+        canvas.fillSprite(getBGColor());
+    }
+    if (SceneLayers::weather) {
+        Weather::drawClouds(canvas, getDrawColor());
+    }
+    if (SceneLayers::seasonFx) {
+        SeasonalFx::drawBackdrop(canvas);  // spring bolts sit in the sky
+    }
     // Back grass first — trees sit on top of turf (foreground of grass)
-    drawGrass(canvas, false);
+    if (SceneLayers::grass) {
+        drawGrass(canvas, false);
+    }
 
     uint32_t now = millis();
 
@@ -1636,7 +1702,7 @@ void Avatar::drawFrame(M5Canvas& canvas, bool blink, bool faceRight, bool sniff)
     }
 
     // Ambient fruit trees + auto-collect fallen fruit/berries near pig
-    {
+    if (SceneLayers::trees) {
         int feet = currentX + 14 * PX;
         int lift = getJumpLiftPx();
         int feetY = 106 - lift;
@@ -1647,10 +1713,9 @@ void Avatar::drawFrame(M5Canvas& canvas, bool blink, bool faceRight, bool sniff)
             if (currentState != AvatarState::HUNTING)
                 setState(AvatarState::HAPPY);
         }
+        // Trees in front of back grass, behind pig
+        drawTree(canvas);
     }
-
-    // Trees in front of back grass, behind pig
-    drawTree(canvas);
 
     // Calculate vertical shake/jump offset
     int shakeY = 0;
@@ -1849,21 +1914,26 @@ void Avatar::drawFrame(M5Canvas& canvas, bool blink, bool faceRight, bool sniff)
     int16_t sitSink = (int16_t)((3 * PX * (int)s_sitBlend) / 256);
     int16_t drawFeetY = (int16_t)(feetY + sitSink);
     // Play-dead: blend flip inside drawPixelPig via s_deadBlend
-    AvatarState drawState = (s_deadBlend > 128) ? AvatarState::SLEEPY : currentState;
-    bool drawBlink = (s_deadBlend > 128) ? true : blink;
-    drawPixelPig(canvas, (int16_t)feetX, drawFeetY,
-                 drawState, faceRight, drawBlink, sniff,
-                 sniffFrame, earPerk, tailAlt, jumpActive,
-                 getDrawColor(), getBGColor());
-
-    updateAndDrawSparkles(canvas);
+    if (SceneLayers::pig) {
+        AvatarState drawState = (s_deadBlend > 128) ? AvatarState::SLEEPY : currentState;
+        bool drawBlink = (s_deadBlend > 128) ? true : blink;
+        drawPixelPig(canvas, (int16_t)feetX, drawFeetY,
+                     drawState, faceRight, drawBlink, sniff,
+                     sniffFrame, earPerk, tailAlt, jumpActive,
+                     getDrawColor(), getBGColor());
+        updateAndDrawSparkles(canvas);
+    }
 
     // Grass IN FRONT of feet/ankles only (not a wall covering the body)
-    drawGrass(canvas, true);
+    if (SceneLayers::grass) {
+        drawGrass(canvas, true);
+    }
 
     // Draw falling drops/splashes in the foreground so they appear above grass
     // (moved from Trees::draw to ensure correct Z-order and collectability).
-    Trees::drawDropsForeground(canvas);
+    if (SceneLayers::trees) {
+        Trees::drawDropsForeground(canvas);
+    }
 }
 
 void Avatar::setGrassMoving(bool moving, bool directionRight, bool force) {
@@ -2067,12 +2137,13 @@ void Avatar::drawGrass(M5Canvas& canvas, bool frontLayer) {
     const bool isSpring = (season == Season::SPRING);
     const bool isAutumn = (season == Season::AUTUMN);
     const bool isWinter = (season == Season::WINTER);
+    const bool isRetro  = (season == Season::RETRO);
     // SUMMER = classic summer greens
 
     const bool wetGrass = Weather::isRaining();
-    const uint16_t dirtMid  = maybeFlash(0x8A40);
-    const uint16_t dirtDark = maybeFlash(isWinter ? 0x6B6D : 0x5140);
-    const uint16_t dirtLite = maybeFlash(isWinter ? 0xC618 : 0xA3E0);
+    const uint16_t dirtMid  = maybeFlash(isRetro ? 0x4208 : 0x8A40);
+    const uint16_t dirtDark = maybeFlash(isRetro ? 0x2104 : (isWinter ? 0x6B6D : 0x5140));
+    const uint16_t dirtLite = maybeFlash(isRetro ? 0x8410 : (isWinter ? 0xC618 : 0xA3E0));
 
     // Seasonal fat-blade palettes (same geometry as classic)
     // SUMMER = deep classic green; SPRING = fresh yellow-lime + flower carpet
@@ -2122,6 +2193,17 @@ void Avatar::drawGrass(M5Canvas& canvas, bool frontLayer) {
         turf1 = maybeFlash(0x5D14);
         turf2 = maybeFlash(0x9CF3);
         FLOWER_COLS = FLOWER_WINTER;
+    } else if (isRetro) {
+        // B&W film grass — blocky gray blades
+        static const uint16_t PAL_RETRO_BASE[4] = { 0x2104, 0x4208, 0x632C, 0x8410 };
+        static const uint16_t PAL_RETRO_TIP[4]  = { 0x9CF3, 0xBDF7, 0xDEFB, 0xFFFF };
+        static const uint16_t FLOWER_RETRO[4]   = { 0xFFFF, 0xC618, 0x8410, 0xAD55 };
+        GRASS_BASE = PAL_RETRO_BASE;
+        GRASS_TIP  = PAL_RETRO_TIP;
+        turf0 = maybeFlash(0x18C3);
+        turf1 = maybeFlash(0x4208);
+        turf2 = maybeFlash(0x6B6D);
+        FLOWER_COLS = FLOWER_RETRO;
     }
 
     // === BACK LAYER ONLY: soil + turf carpet ===

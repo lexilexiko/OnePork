@@ -145,9 +145,27 @@ static SeasonTree styleFromSeason(Season s) {
         case Season::SUMMER: return SeasonTree::APPLE;
         case Season::AUTUMN: return SeasonTree::OLD_APPLE;
         case Season::WINTER: return SeasonTree::FIR;
+        case Season::RETRO:  return SeasonTree::APPLE;  // round canopy, mono colors applied at draw
         default: return SeasonTree::APPLE;
     }
 }
+
+static bool isRetroSeason() {
+    return Weather::getActiveSeason() == Season::RETRO;
+}
+
+// Silver-screen flora palette (old film)
+static constexpr uint16_t R_TRUNK  = 0x4208;
+static constexpr uint16_t R_TRUNK2 = 0x2104;
+static constexpr uint16_t R_TRUNK_H= 0x7BEF;
+static constexpr uint16_t R_LEAF   = 0x4A49;
+static constexpr uint16_t R_LEAF2  = 0x8410;
+static constexpr uint16_t R_LEAF3  = 0xBDF7;
+static constexpr uint16_t R_FIR    = 0x632C;
+static constexpr uint16_t R_FIR2   = 0x9CF3;
+static constexpr uint16_t R_FIR3   = 0x3186;
+static constexpr uint16_t R_SNOW   = 0xFFFF;
+static constexpr uint16_t R_SNOW2  = 0xC618;
 
 static SeasonTree currentStyle() {
     return styleFromSeason(Weather::getActiveSeason());
@@ -861,17 +879,25 @@ static void drawFir(M5Canvas& canvas, Slot& t, int16_t yOffset) {
     if (collapsing) g = t.growth;
     if (g < 0.05f) return;
 
-    // Thin brown trunk
+    // Thin trunk (brown normal / B&W retro)
+    const bool retro = isRetroSeason();
     int16_t trunkH = (int16_t)(t.trunkH * g);
     if (collapsing) {
         float ct = 1.0f - t.growth;
         trunkH -= (int16_t)(ct * ct * t.trunkH);
         if (trunkH < 0) trunkH = 0;
     }
-    uint16_t bark = fl(C_TRUNK2);
+    uint16_t bark = fl(retro ? R_TRUNK2 : C_TRUNK2);
+    uint16_t barkLite = fl(retro ? R_TRUNK : C_TRUNK);
+    uint16_t firD = fl(retro ? R_FIR3 : C_FIR3);
+    uint16_t firM = fl(retro ? R_FIR : C_FIR);
+    uint16_t firL = fl(retro ? R_FIR2 : C_FIR2);
+    uint16_t snow1 = fl(retro ? R_SNOW : 0xFFFF);
+    uint16_t snow2 = fl(retro ? R_SNOW2 : 0xDEFB);
+    uint16_t snow3 = fl(retro ? R_LEAF2 : 0xEF7D);
     if (trunkH > 0) {
         canvas.fillRect(bx - PX + sway, baseY - trunkH, PX * 2, trunkH, bark);
-        canvas.fillRect(bx + sway, baseY - trunkH, PX, trunkH, fl(C_TRUNK));
+        canvas.fillRect(bx + sway, baseY - trunkH, PX, trunkH, barkLite);
     }
 
     // Needle tiers (branch rows)
@@ -893,29 +919,27 @@ static void drawFir(M5Canvas& canvas, Slot& t, int16_t yOffset) {
             for (int16_t row = 0; row < half / 2 + PX; row += PX) {
                 int16_t w = half - row;
                 if (w < PX) w = PX;
-                uint16_t col = fl((row == 0) ? C_FIR3 : ((i + row / PX) & 1) ? C_FIR : C_FIR2);
+                uint16_t col = (row == 0) ? firD : (((i + row / PX) & 1) ? firM : firL);
                 canvas.fillRect(bx - w + sway, ty + row, w * 2, PX, col);
             }
             // tip
-            canvas.fillRect(bx - PX + sway, ty - PX, PX * 2, PX, fl(C_FIR2));
-            // Snow on fir — cap + side patches + lower fluff (winter volume)
+            canvas.fillRect(bx - PX + sway, ty - PX, PX * 2, PX, firL);
+            // Cap / side patches (snow in winter, film grain white in retro)
             int16_t snowW = half > PX ? half : PX * 2;
-            canvas.fillRect(bx - half / 2 + sway, ty - PX, snowW, PX, fl(0xFFFF));
-            canvas.fillRect(bx - half / 3 + sway, ty - 2 * PX, half / 2 + PX, PX, fl(0xDEFB));
-            // left/right snow clumps on needles
+            canvas.fillRect(bx - half / 2 + sway, ty - PX, snowW, PX, snow1);
+            canvas.fillRect(bx - half / 3 + sway, ty - 2 * PX, half / 2 + PX, PX, snow2);
             if (half > PX * 3) {
-                canvas.fillRect(bx - half + PX + sway, ty + PX, PX * 2, PX, fl(0xFFFF));
-                canvas.fillRect(bx + half - PX * 3 + sway, ty + PX, PX * 2, PX, fl(0xDEFB));
+                canvas.fillRect(bx - half + PX + sway, ty + PX, PX * 2, PX, snow1);
+                canvas.fillRect(bx + half - PX * 3 + sway, ty + PX, PX * 2, PX, snow2);
             }
-            // mid-tier dusting (every other tier)
             if ((i & 1) == 0 && half > PX * 2) {
-                canvas.fillRect(bx - PX + sway, ty + PX * 2, PX * 2, PX, fl(0xEF7D));
+                canvas.fillRect(bx - PX + sway, ty + PX * 2, PX * 2, PX, snow3);
             }
         }
-        // Base snow pile at trunk foot
+        // Base pile at trunk foot
         if (!collapsing && g > 0.5f) {
-            canvas.fillRect(bx - PX * 3 + sway, baseY - PX, PX * 6, PX, fl(0xFFFF));
-            canvas.fillRect(bx - PX * 2 + sway, baseY - 2 * PX, PX * 4, PX, fl(0xDEFB));
+            canvas.fillRect(bx - PX * 3 + sway, baseY - PX, PX * 6, PX, snow1);
+            canvas.fillRect(bx - PX * 2 + sway, baseY - 2 * PX, PX * 4, PX, snow2);
         }
     }
 
@@ -949,9 +973,23 @@ static void drawTreeSlot(M5Canvas& canvas, Slot& t, int16_t yOffset) {
         return;
     }
 
-    // Trunk palette by species
+    // Trunk + leaf palettes by species (RETRO = full B&W film stock)
     uint16_t trunkCol, trunkDark, trunkHi;
-    if (!isBerry && t.style == SeasonTree::CHERRY) {
+    uint16_t leafCol, leafLite, leafHi;
+    const Season season = Weather::getActiveSeason();
+    const bool retro  = (season == Season::RETRO);
+    const bool winter = (season == Season::WINTER);
+    const bool autumn = (season == Season::AUTUMN);
+    const bool spring = (season == Season::SPRING);
+
+    if (retro) {
+        trunkCol  = fl(R_TRUNK);
+        trunkDark = fl(R_TRUNK2);
+        trunkHi   = fl(R_TRUNK_H);
+        leafCol   = fl(R_LEAF);
+        leafLite  = fl(R_LEAF2);
+        leafHi    = fl(R_LEAF3);
+    } else if (!isBerry && t.style == SeasonTree::CHERRY) {
         trunkCol  = fl(C_CHERRY_TRUNK);
         trunkDark = fl(C_CHERRY_TRUNK2);
         trunkHi   = fl(C_CHERRY_TRUNK_H);
@@ -965,60 +1003,49 @@ static void drawTreeSlot(M5Canvas& canvas, Slot& t, int16_t yOffset) {
         trunkHi   = fl(C_TRUNK_H);
     }
 
-    // Leaf palettes — always 3 shades (dark / mid / lit) for volume
-    const Season season = Weather::getActiveSeason();
-    const bool winter = (season == Season::WINTER);
-    const bool autumn = (season == Season::AUTUMN);
-    const bool spring = (season == Season::SPRING);
-    uint16_t leafCol, leafLite, leafHi;
-    if (isBerry) {
-        if (winter) {
-            // Snowy winter bush
-            leafCol  = fl(0x6B6D);   // dark ice-gray (volume)
-            leafLite = fl(0xBDF7);   // mid
-            leafHi   = fl(0xFFFF);   // snow cap
-        } else if (autumn) {
-            // Same volume greens as summer bush (user liked summer look)
-            leafCol  = fl(0x0A20);
-            leafLite = fl(0x1C60);
-            leafHi   = fl(0x45A0);
-        } else if (spring) {
-            // Fresh spring bush — two greens + bright tip
-            leafCol  = fl(0x1C40);   // dark green
-            leafLite = fl(C_SPRING); // mid
-            leafHi   = fl(C_SPRING3);// light
+    if (!retro) {
+        // Leaf palettes — always 3 shades (dark / mid / lit) for volume
+        if (isBerry) {
+            if (winter) {
+                leafCol  = fl(0x6B6D);
+                leafLite = fl(0xBDF7);
+                leafHi   = fl(0xFFFF);
+            } else if (autumn) {
+                leafCol  = fl(0x0A20);
+                leafLite = fl(0x1C60);
+                leafHi   = fl(0x45A0);
+            } else if (spring) {
+                leafCol  = fl(0x1C40);
+                leafLite = fl(C_SPRING);
+                leafHi   = fl(C_SPRING3);
+            } else {
+                leafCol  = fl(0x0A20);
+                leafLite = fl(0x1C60);
+                leafHi   = fl(0x45A0);
+            }
+        } else if (t.style == SeasonTree::CHERRY) {
+            leafCol  = fl(C_BLOSSOM1);
+            leafLite = fl(C_BLOSSOM2);
+            leafHi   = fl(C_BLOSSOM3);
+        } else if (t.style == SeasonTree::OLD_APPLE) {
+            leafCol  = fl(C_OAK3);
+            leafLite = fl(C_OAK1);
+            leafHi   = fl(C_OAK2);
+        } else if (isDecor) {
+            if (winter) {
+                leafCol  = fl(0x0A20);
+                leafLite = fl(0x1C40);
+                leafHi   = fl(0x9CD3);
+            } else {
+                leafCol  = fl(0x0A00);
+                leafLite = fl(0x1C40);
+                leafHi   = fl(0x3C80);
+            }
         } else {
-            // Summer bush — clear dark/mid for volume
-            leafCol  = fl(0x0A20);   // deep green (one tone below mid)
-            leafLite = fl(0x1C60);   // body green
-            leafHi   = fl(0x45A0);   // sunlit
-        }
-    } else if (t.style == SeasonTree::CHERRY) {
-        // Pink blossom canopy — spring sakura look (unique from green summer)
-        leafCol  = fl(C_BLOSSOM1);  // deep rose
-        leafLite = fl(C_BLOSSOM2);  // mid pink
-        leafHi   = fl(C_BLOSSOM3);  // pale tips
-    } else if (t.style == SeasonTree::OLD_APPLE) {
-        leafCol  = fl(C_OAK3);      // brown-red dark
-        leafLite = fl(C_OAK1);      // orange
-        leafHi   = fl(C_OAK2);      // yellow
-    } else if (isDecor) {
-        if (winter) {
-            // Classic winter tree (not fir) — cool green + snow will sit on leaves
-            leafCol  = fl(0x0A20);
-            leafLite = fl(0x1C40);
-            leafHi   = fl(0x9CD3);  // frosty rim
-        } else {
-            // Summer decor — same volume treatment as apple canopy
             leafCol  = fl(0x0A00);
-            leafLite = fl(0x1C40);
-            leafHi   = fl(0x3C80);
+            leafLite = fl(0x1C20);
+            leafHi   = fl(0x3C60);
         }
-    } else {
-        // Summer apple tree — two greens + highlight (volume, not flat)
-        leafCol  = fl(0x0A00);      // darkest (one tone below body)
-        leafLite = fl(0x1C20);      // body green
-        leafHi   = fl(0x3C60);      // bright rim so apples pop
     }
 
     uint32_t now = millis();

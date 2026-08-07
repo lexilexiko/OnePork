@@ -93,17 +93,8 @@ void ChargingMode::start() {
         Serial.println("[CHARGING] WiFi already off");
     }
     
-    // Deinit BLE if initialized
-    if (NimBLEDevice::isInitialized()) {
-        NimBLEScan* pScan = NimBLEDevice::getScan();
-        if (pScan && pScan->isScanning()) {
-            pScan->stop();
-        }
-        NimBLEAdvertising* pAdv = NimBLEDevice::getAdvertising();
-        if (pAdv && pAdv->isAdvertising()) {
-            pAdv->stop();
-        }
-        NimBLEDevice::deinit(true);
+    // Full BLE teardown so exit→NetworkRecon::start() has contiguous heap
+    if (WiFiUtils::releaseBleStack()) {
         Serial.println("[CHARGING] BLE deinitialized");
     }
     

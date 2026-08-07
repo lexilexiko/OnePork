@@ -2,8 +2,8 @@
                     Volume Zero, Issue 3, Phile 1 of 1
 
                           M5PORKCHOP README
-                          v0.1.8c (1.4.1)
-                   (upstream 0.1.8c · One Pork fan package 1.4.1)
+                          v0.1.8c (1.4.5)
+                   (upstream 0.1.8c · One Pork fan package 1.4.5)
 
                             ^__^
                             (oo)\_______
@@ -35,7 +35,7 @@
     12. TROUBLESHOOTING (the confessional)
     13. GREETZ
     14. RECENT PORK (v0.1.8c community pass + thank you)
-    15. ONE PORK v0.1.8c (1.4.1) — fan packaging; donate the original
+    15. ONE PORK v0.1.8c (1.4.5) — fan packaging; donate the original
 
     (pro tip: CTRL+F "horse" for enlightenment.
      we counted them. the horse counted more.
@@ -1357,8 +1357,8 @@
     upstream official:
         github.com/0ct0sec/M5PORKCHOP/releases
 
-    One Pork fan binary (this tree, v0.1.8c (1.4.1)):
-        releases/OnePork_v0.1.8c-1.4.1_m5cardputer_firmware.bin
+    One Pork fan binary (this tree, v0.1.8c (1.4.5)):
+        releases/OnePork_v0.1.8c-1.4.5_m5cardputer_firmware.bin
         (on GitHub: repo → releases/ folder or Releases page if published)
 
     1. download firmware.bin
@@ -1689,11 +1689,11 @@
 
 ------------------------------------------------------------------------
 
---[ 15 - ONE PORK v0.1.8c (1.4.1) (FAN PACKAGING)
+--[ 15 - ONE PORK v0.1.8c (1.4.5) (FAN PACKAGING)
 
-    VERSION: **v0.1.8c (1.4.1)**
+    VERSION: **v0.1.8c (1.4.5)**
         - 0.1.8c   = last known upstream M5PORKCHOP line this tree is based on
-        - (1.4.1)  = One Pork fan package revision (1.4 + post-ship fixes)
+        - (1.4.5)  = One Pork fan package revision (1.4 + fixes + RETRO + radio)
 
     this folder may be published as **One Pork** — a fan / community
     packaging of M5PORKCHOP. it is NOT a rewrite of authorship.
@@ -1712,7 +1712,7 @@
     full fan changelog + tree map: **FAN.md**
 
 
-----[ 15.2 - WHAT 1.4 / 1.4.1 ADDED / FIXED (SHORT)
+----[ 15.2 - WHAT 1.4 → 1.4.5 ADDED / FIXED (SHORT)
 
     NEW (1.4):
     - [I] 1RP0RK    — IR power blast (N4/EU packs), custom SD /ir/*.txt
@@ -1723,6 +1723,13 @@
     - boot / ABOUT  — 0N3 P0RK branding + version stamp
     - fan XP        — fruit pick, wolf scare/hide, PigPass crack, EvilPig catch
     - ST4TS rows    — FRU1T / W0LF H1T / H1D3 / CR4CK / EV1L H1T (NVS)
+
+    NEW (1.4.5):
+    - **RETRO season + pig skin** — B&W film world (pixel rain, mono trees/bars/clouds)
+    - SCENE lab (settings) — toggle sky/grass/trees/pig/weather/mood/wolf + **CPU HUD**
+    - IR sparkle-storm anim + IR_FIRE SFX (no radio rings)
+    - wolf only on IDLE / Fruit Run (not work modes)
+    - SFX layering polish (IR mute, low-pri drop)
 
     FIXED (1.4):
     - [B] BLUES cold start reboot/black screen
@@ -1735,6 +1742,12 @@
           (HTTP 200 portal page on generate_204 / hotspot-detect / etc.,
            fixed 192.168.4.1 gateway, DNS TTL 0, multi-pump DNS+HTTP,
            Connection: close + no-cache — phones open login sheet again)
+
+    FIXED (1.4.5):
+    - [B] BLUES exit hard-reset after OINK (radio handoff order)
+          release NimBLE **before** re-reserving NetworkRecon table;
+          probe-safe reserve (no abort); WiFiUtils::releaseBleStack()
+    - CPU HUD moved to top bar free slot
 
     SCENE (carried):
     - trees + drops, wolf visitor, seasonal FX, free-roam IDLE polish
