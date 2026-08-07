@@ -511,55 +511,26 @@ void PiggyBluesMode::start() {
     Mood::resetBLESniffState();  // Reset first-target sniff for new session
     Display::clearBottomOverlay();
     Display::notify(NoticeKind::STATUS, "BLUES ON", 1200, NoticeChannel::TOP_BAR);
-
-    // ------------------------------------------------------------------
-    // Why OINK-first "fixed" B: handshake mode fully exercises WiFi STA +
-    // promiscuous (NetworkRecon), then leaves a clean handoff. Cold B after
-    // boot kept recon's ~19KB network table + promisc hooks while NimBLE
-    // tried to start → hard reset / black screen. Same idea as XFER and the
-    // "OINK bounce" heap brew — free recon memory, keep WiFi driver, then BLE.
-    // ------------------------------------------------------------------
-    if (!NetworkRecon::isRunning() && !NetworkRecon::isPaused()) {
-        // Belt-and-suspenders: WiFi driver must exist once (boot usually did this)
-        WiFi.persistent(false);
-        WiFi.setSleep(false);
-        WiFi.mode(WIFI_STA);
-        delay(50);
-        yield();
-    }
-
-    // Exclusive radio for BLE: stop promisc AND free networks vector (~19KB)
-    // so NimBLE can allocate. stop() alone left the table reserved.
-    NetworkRecon::stop();
-    NetworkRecon::freeNetworks();
-    delay(50);
-    yield();
     
-    // Keep WiFi *driver* initialized (shared antenna). WIFI_OFF → deinit
-    // breaks RX buffers on later NetworkRecon::start().
-    WiFi.mode(WIFI_STA);
+    // Stop NetworkRecon before disabling WiFi (BLE needs exclusive radio)
+    NetworkRecon::stop();
+    
+    // Stop WiFi radio but keep driver initialized (shared antenna for BLE)
+    // WiFi.mode(WIFI_OFF) calls esp_wifi_deinit() which causes RX buffer allocation
+    // failures on restart — use esp_wifi_stop() to keep buffers allocated
     WiFi.disconnect(true);
     delay(BLE_OP_DELAY_MS);
-    yield();
     
     // Initialize NimBLE only if not already initialized
     if (!NimBLEDevice::isInitialized()) {
         NimBLEDevice::init("");
-        delay(20);
-        yield();
-    }
-    if (!NimBLEDevice::isInitialized()) {
-        Display::notify(NoticeKind::WARNING, "BLE INIT FAIL", 2500, NoticeChannel::TOP_BAR);
-        NetworkRecon::start();  // restore recon after failed handoff
-        return;
     }
     NimBLEDevice::setPower(ESP_PWR_LVL_P9);  // Max power for range
     NimBLEDevice::setOwnAddrType(BLE_OWN_ADDR_RANDOM);  // Use random address
     
     pAdvertising = NimBLEDevice::getAdvertising();
     if (!pAdvertising) {
-        Display::notify(NoticeKind::WARNING, "BLE ADV FAIL", 2500, NoticeChannel::TOP_BAR);
-        NetworkRecon::start();
+        WiFi.mode(WIFI_STA);  // Re-enable WiFi on failure
         return;
     }
     pAdvertising->setMinInterval(BLE_ADV_MIN_INTERVAL);  // 20ms
@@ -594,12 +565,17 @@ void PiggyBluesMode::stop() {
         pAdvertising->stop();
         delay(BLE_OP_DELAY_MS);
     }
-    pAdvertising = nullptr;  // invalid after releaseBleStack / deinit
+    // Keep pAdvertising pointer - we'll reuse it on restart
+    
+    // Give BLE stack time to settle
     delay(BLE_STACK_SETTLE_MS);
-
+    
+    // DON'T call deinit - ESP32-S3 has issues reinitializing BLE after deinit
+    // Just keep BLE initialized but idle
+    
     running = false;
     targets.clear();
-    targets.shrink_to_fit();  // Release vector capacity to recover heap
+    targets.shrink_to_fit();  // FIX: Release vector capacity to recover heap
     activeCount = 0;
     setAdvertisingNow(false);
     
@@ -613,17 +589,11 @@ void PiggyBluesMode::stop() {
     XP::addRouletteWin();  // keep counter for stats/achievements
     XP::addXPSilent(EXIT_XP_BONUS);
 
-    // Exclusive radio handoff back to WiFi recon:
-    //   BLE deinit FIRST (frees ~20-30KB) → then NetworkRecon re-reserves table.
-    // Leaving BLE "idle" and reserving inside start() was the OINK→B→exit reboot
-    // (vector::reserve aborts when contig heap is still held by NimBLE).
-    WiFiUtils::releaseBleStack();
-    advCachePrimed = false;  // cache held NimBLE objects; rebuild on next start
-
+    // Restore WiFi after BLE exclusive use in start()
     WiFi.mode(WIFI_STA);
     delay(HeapPolicy::kWiFiModeDelayMs);
 
-    // Background recon for OINK / SPECTRUM / IDLE
+    // Background recon for OINK / other WiFi modes
     NetworkRecon::start();
 }
 

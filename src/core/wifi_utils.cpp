@@ -32,39 +32,6 @@ static void brewPromiscuousCallback(void* buf, wifi_promiscuous_pkt_type_t type)
     brewPacketCount++;
 }
 
-bool releaseBleStack() {
-    if (!NimBLEDevice::isInitialized()) {
-        return false;
-    }
-
-    Serial.println("[RADIO] Releasing BLE stack for WiFi/recon handoff");
-
-    NimBLEScan* pScan = NimBLEDevice::getScan();
-    if (pScan && pScan->isScanning()) {
-        pScan->stop();
-        delay(HeapPolicy::kBleStopDelayMs);
-    }
-
-    NimBLEAdvertising* pAdv = NimBLEDevice::getAdvertising();
-    if (pAdv && pAdv->isAdvertising()) {
-        pAdv->stop();
-        delay(HeapPolicy::kBleStopDelayMs);
-    }
-
-    // Full deinit reclaims ~20-30KB of NimBLE host/controller buffers.
-    // Required before NetworkRecon re-reserves its ~19KB networks vector —
-    // otherwise vector::reserve can abort() (exceptions off) → hard reset.
-    NimBLEDevice::deinit(true);
-    delay(HeapPolicy::kBleDeinitDelayMs);
-    yield();
-    delay(50);
-
-    Serial.printf("[RADIO] BLE released: free=%u largest=%u\n",
-                  (unsigned)ESP.getFreeHeap(),
-                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
-    return true;
-}
-
 static void ensureInitialized() {
     if (initialized) return;
     portENTER_CRITICAL(&initMux);

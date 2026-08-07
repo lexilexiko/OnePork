@@ -39,25 +39,19 @@ void init();
  * @brief Start background WiFi promiscuous scanning
  * Enables WiFi, sets up callback, starts channel hopping
  * Heap stabilizes ~115ms after first packets received
- *
- * Radio ownership: claims WiFi-promisc. Releases NimBLE first if active
- * (BLE and promisc are exclusive on this hardware).
  */
 void start();
 
 /**
  * @brief Full stop - disables WiFi promiscuous mode
- * Used when entering BLE modes (PIGGYBLUES) that need exclusive radio
+ * Used when entering BLE modes (PIGGYBLUES) that need WiFi OFF
  */
 void stop();
 
 /**
  * @brief Release the networks vector memory entirely
- * Call after stop() when entering modes that don't use recon data
- * (XFER, BLE, SoftAP portal). start() will re-reserve after BLE is gone.
- *
- * Do NOT call freeNetworks() and then reserve while NimBLE is still up —
- * that path hard-resets (exceptions off → abort on failed reserve).
+ * Call after stop() when entering modes that don't use recon data (XFER).
+ * start() will re-reserve and rescan on mode exit.
  */
 void freeNetworks();
 

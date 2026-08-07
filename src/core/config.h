@@ -140,7 +140,8 @@ struct PersonalityConfig {
     // Random fruit trees + ambient drops in avatar scene
     bool fruitTreesAmbient = true;
     G0Action g0Action = G0Action::SCREEN_TOGGLE;
-    BootMode bootMode = BootMode::IDLE;
+    // Fan default OINK: warms WiFi/heap so XFER / WPA-SEC / BLUES behave after boot
+    BootMode bootMode = BootMode::OINK;
 };
 
 // Sky mode labels (settings)

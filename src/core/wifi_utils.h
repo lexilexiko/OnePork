@@ -59,17 +59,6 @@ namespace WiFiUtils {
     TimeSyncStatus maybeSyncTimeForFileTransfer();
     
     /**
-     * @brief Stop scan/adv and fully deinit NimBLE if it is initialized.
-     *
-     * Exclusive radio handoff: BLE and WiFi-promisc/recon cannot share the
-     * antenna + ~20-30KB NimBLE buffers. Call this BEFORE re-reserving the
-     * NetworkRecon table or enabling promiscuous mode after PiggyBlues.
-     *
-     * @return true if BLE was active and deinit ran
-     */
-    bool releaseBleStack();
-
-    /**
      * @brief Conditions heap for TLS operations by releasing fragmented memory
      * 
      * This mimics the "OINK bounce" effect where entering/exiting OINK mode

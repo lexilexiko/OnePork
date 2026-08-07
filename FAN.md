@@ -1,8 +1,8 @@
 # One Pork — fan build notes
 
-**Version: v0.1.8c (1.4.5)**  
+**Version: v0.1.8c (1.4.6)**  
 - `0.1.8c` — last known upstream M5PORKCHOP base  
-- `(1.4.5)` — One Pork fan package revision
+- `(1.4.6)` — One Pork fan package revision
 
 This tree is a **fan / community packaging** of **M5PORKCHOP**.
 
@@ -44,7 +44,29 @@ License: MIT — Copyright (c) 2025 **0ct0** (`LICENSE`).
 
 ---
 
-## v1.4.5 changelog (latest)
+## v1.4.6 changelog (latest) — radio kludge / fix
+
+### The hard problem
+
+ESP32-S3: OINK promisc, BLUES (NimBLE), and STA+TLS (XFER / WPA-SEC) share one
+radio and a tiny heap. “Correct” exclusive handoffs kept fixing one path and
+breaking another (including hard resets on failed `reserve`).
+
+### Workaround (works for us)
+
+- **NetworkRecon / BLUES radio** restored to the **known-good 1.3 pattern**
+- **Auto-OINK ~5s after boot** (OINK bounce warm-up) so net/BLE behave without
+  a manual OINK first; default BOOT MODE = OINK; old NVS IDLE → still warm OINK
+
+Not pretty. Ship it while it works.
+
+### Still from 1.4.5
+
+RETRO, SCENE lab, G0 quiet dark, IR/Fruit/RANK/XP, etc.
+
+---
+
+## v1.4.5 changelog
 
 ### New
 
@@ -169,7 +191,7 @@ In 1RP0RK: **E** = pick file, **SPC** = fire, **R** = N4/EU region, **B** = buil
 
 Prebuilt binary (when shipped):
 
-- `releases/OnePork_v0.1.8c-1.4.5_m5cardputer_firmware.bin`
+- `releases/OnePork_v0.1.8c-1.4.6_m5cardputer_firmware.bin`
 
 Flash with M5 Launcher / M5Burner / `esptool`.  
 XP is kept if you update via M5 Launcher (do not wipe NVS).

@@ -847,9 +847,10 @@ bool Config::loadPersonality() {
         g0Action = static_cast<uint8_t>(G0Action::SCREEN_TOGGLE);
     }
     personalityConfig.g0Action = static_cast<G0Action>(g0Action);
-    uint8_t bootMode = doc["bootMode"] | static_cast<uint8_t>(BootMode::IDLE);
+    // Default OINK when key missing (warm radio after boot). Explicit 0=IDLE still honored.
+    uint8_t bootMode = doc["bootMode"] | static_cast<uint8_t>(BootMode::OINK);
     if (bootMode >= BOOT_MODE_COUNT) {
-        bootMode = static_cast<uint8_t>(BootMode::IDLE);
+        bootMode = static_cast<uint8_t>(BootMode::OINK);
     }
     personalityConfig.bootMode = static_cast<BootMode>(bootMode);
 
@@ -947,7 +948,7 @@ bool Config::createDefaultPersonality() {
     personalityConfig.patience = 0.5f;
     personalityConfig.soundLevel = 1;
     personalityConfig.g0Action = G0Action::SCREEN_TOGGLE;
-    personalityConfig.bootMode = BootMode::IDLE;
+    personalityConfig.bootMode = BootMode::OINK;
     return true;
 }
 

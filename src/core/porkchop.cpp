@@ -261,12 +261,19 @@ void Porkchop::init() {
     }
     bool bootGuardActive = bootGuardStreak >= BOOT_GUARD_THRESHOLD;
 
+    // Fan reliability (1.3 radio stack): OINK after boot warms WiFi/heap so
+    // XFER / WPA-SEC / BLUES don't need a manual "OINK bounce" first.
+    // Settings → BOOT MODE still wins if user picked DNOHAM/WARHOG/OINK.
+    // If BOOT MODE is IDLE (old NVS default), force OINK warm-up anyway.
     BootMode bootMode = Config::personality().bootMode;
+    if (bootMode == BootMode::IDLE) {
+        bootMode = BootMode::OINK;
+    }
     bootModeTarget = bootModeToPorkchop(bootMode);
     if (bootModeTarget != PorkchopMode::IDLE && !bootGuardActive) {
         bootModePending = true;
         bootModeStartMs = millis();
-        char buf[32];
+        char buf[36];
         snprintf(buf, sizeof(buf), "BOOT -> %s IN 5S", bootModeLabel(bootMode));
         Display::showToast(buf, 5000);
     } else if (bootModeTarget != PorkchopMode::IDLE && bootGuardActive) {
