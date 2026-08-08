@@ -2,8 +2,8 @@
                     Volume Zero, Issue 3, Phile 1 of 1
 
                           M5PORKCHOP README
-                          v0.1.8c (1.4.6)
-                   (upstream 0.1.8c · One Pork fan package 1.4.6)
+                          v0.1.8c (1.6)
+                   (upstream 0.1.8c · One Pork fan package 1.6 — pWnCrack)
 
                             ^__^
                             (oo)\_______
@@ -35,7 +35,7 @@
     12. TROUBLESHOOTING (the confessional)
     13. GREETZ
     14. RECENT PORK (v0.1.8c community pass + thank you)
-    15. ONE PORK v0.1.8c (1.4.6) — fan packaging; donate the original
+    15. ONE PORK v0.1.8c (1.6) — pWnCrack; fan packaging; donate the original
 
     (pro tip: CTRL+F "horse" for enlightenment.
      we counted them. the horse counted more.
@@ -1357,8 +1357,8 @@
     upstream official:
         github.com/0ct0sec/M5PORKCHOP/releases
 
-    One Pork fan binary (this tree, v0.1.8c (1.4.6)):
-        releases/OnePork_v0.1.8c-1.4.6_m5cardputer_firmware.bin
+    One Pork fan binary (this tree, v0.1.8c (1.6)):
+        releases/OnePork_v0.1.8c-1.6_m5cardputer_firmware.bin
         (on GitHub: repo → releases/ folder or Releases page if published)
 
     1. download firmware.bin
@@ -1689,11 +1689,12 @@
 
 ------------------------------------------------------------------------
 
---[ 15 - ONE PORK v0.1.8c (1.4.6) (FAN PACKAGING)
+--[ 15 - ONE PORK v0.1.8c (1.6) (FAN PACKAGING)
 
-    VERSION: **v0.1.8c (1.4.6)**
+    VERSION: **v0.1.8c (1.6)**
         - 0.1.8c   = last known upstream M5PORKCHOP line this tree is based on
-        - (1.4.6)  = One Pork fan package (1.4.x + radio kludge: 1.3 handoff + auto-OINK)
+        - (1.6)    = pWnCrack (pwncrack.org) + 1.4.x tree + radio kludge (1.3 handoff + auto-OINK)
+        - Notes:   releases/RELEASE_NOTES_1.6.md  (bugs + workarounds)
 
     this folder may be published as **One Pork** — a fan / community
     packaging of M5PORKCHOP. it is NOT a rewrite of authorship.

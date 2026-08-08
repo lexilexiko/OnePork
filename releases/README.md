@@ -1,14 +1,19 @@
 # Prebuilt firmware (One Pork)
 
-**Version:** v0.1.8c (1.4.6)  
-**File:** `OnePork_v0.1.8c-1.4.6_m5cardputer_firmware.bin`  
+**Version:** v0.1.8c (1.6) — **pWnCrack**  
+**File:** `OnePork_v0.1.8c-1.6_m5cardputer_firmware.bin`  
 **Target:** M5Cardputer (ESP32-S3 StampS3)
 
 ## Install
 
-1. Download the `.bin` from this folder (or a GitHub Release if attached).
+1. Download the `.bin` from this folder (or the GitHub Release).
 2. Flash with **M5 Launcher** (recommended — keeps XP in NVS) or M5Burner / esptool.
-3. Reboot — after ~5s auto **OINK** warm-up (see 1.4.6 notes), then oink.
+3. Reboot — ~5s auto **OINK** warm-up, then loot / pwncrack.
+
+## 1.6 highlight
+
+- **PWNCRACK** — pwncrack.org client (separate from WPA-SEC)  
+- Full notes + **known bugs / workarounds:** `RELEASE_NOTES_1.6.md`
 
 ## Credits
 

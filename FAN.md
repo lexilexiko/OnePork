@@ -1,8 +1,8 @@
 # One Pork — fan build notes
 
-**Version: v0.1.8c (1.4.6)**  
+**Version: v0.1.8c (1.6)**  
 - `0.1.8c` — last known upstream M5PORKCHOP base  
-- `(1.4.6)` — One Pork fan package revision
+- `(1.6)` — One Pork fan package — **pwncrack.org**
 
 This tree is a **fan / community packaging** of **M5PORKCHOP**.
 
@@ -44,7 +44,30 @@ License: MIT — Copyright (c) 2025 **0ct0** (`LICENSE`).
 
 ---
 
-## v1.4.6 changelog (latest) — radio kludge / fix
+## v1.6 changelog (latest) — pWnCrack
+
+### New
+
+- **PWNCRACK** — client for [pwncrack.org](https://pwncrack.org/) (not WPA-SEC)
+  - LOOT menu + Integrations key (`/m5porkchop/pwncrack/key.txt`)
+  - HASHES-style list: SSID / ST / TYPE / SIZE · Enter = password if cracked
+  - **S** upload+potfile · **T** net diagnostic · **R** key · **C** clear upload log
+  - Upload renames to `.hc22000` in HTTP only (SD stays `.22000`)
+- Bottom-bar control hints for PWNCRACK
+
+### Known bugs (shipped intentionally)
+
+Rare **reboot** when opening PWNCRACK right after **HASHES/WPA-SEC** or **XFER**
+(heap/radio). **After reboot, everything works** — preferred over “radio
+borrow” patches that broke STA internet. Full workarounds: `releases/RELEASE_NOTES_1.6.md`.
+
+### Still from 1.4.6 / 1.4.5
+
+Auto-OINK + 1.3 radio kludge, RETRO, SCENE lab, G0 quiet dark, IR/Fruit/RANK/XP, etc.
+
+---
+
+## v1.4.6 changelog — radio kludge / fix
 
 ### The hard problem
 
@@ -191,7 +214,7 @@ In 1RP0RK: **E** = pick file, **SPC** = fire, **R** = N4/EU region, **B** = buil
 
 Prebuilt binary (when shipped):
 
-- `releases/OnePork_v0.1.8c-1.4.6_m5cardputer_firmware.bin`
+- `releases/OnePork_v0.1.8c-1.6_m5cardputer_firmware.bin`
 
 Flash with M5 Launcher / M5Burner / `esptool`.  
 XP is kept if you update via M5 Launcher (do not wipe NVS).
