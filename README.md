@@ -1,6 +1,6 @@
 # One Pork
 
-**Fan package** of [M5PORKCHOP](https://github.com/0ct0sec/M5PORKCHOP) for **M5Cardputer** (ESP32-S3).
+**Fan package** of [M5PORKCHOP](https://github.com/0ct0sec/M5PORKCHOP) for **M5Cardputer** (ESP32-S3) (Recommended for Cardputer ADV) .
 
 | | |
 |--|--|
@@ -8,6 +8,8 @@
 | **Upstream base** | M5PORKCHOP **0.1.8c** |
 | **This repo** | https://github.com/lexilexiko/OnePork |
 | **Upstream** | https://github.com/0ct0sec/M5PORKCHOP |
+| ** 
+To fix the PWNCRACK crash/reboot issue, delete all files except the key; you can do this via the launcher or within OnePork itself. ||
 
 ```
         ^__^
