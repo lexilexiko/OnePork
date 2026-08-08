@@ -124,7 +124,7 @@ static const EntryData kDirectEntries[] = {
 static const EntryData kSceneEntries[] = {
     {SET_SKY, "SKY", SettingType::VALUE, 0, (int)SKY_MODE_COUNT - 1, 1, "", "AUTO dusk/dawn / DAY / NIGHT"},
     {SET_SEASON, "SEASON", SettingType::VALUE, 0, (int)SEASON_MODE_COUNT - 1, 1, "", "AUTO / SPRING..RETRO"},
-    {SET_PIG_SKIN, "PIG SKIN", SettingType::VALUE, 0, (int)PIG_SKIN_COUNT - 1, 1, "", "CLASSIC/BLUSH/HOG/ZOMBIE/RETRO"},
+    {SET_PIG_SKIN, "PIG SKIN", SettingType::VALUE, 0, (int)PIG_SKIN_COUNT - 1, 1, "", "ZOMBIE=3 NIGHT WOLF BITES"},
     {SET_SCROLL_SPD, "SCROLL SPD", SettingType::VALUE, 1, 10, 1, "", "WORLD SCROLL AT EDGES 1-10"},
     {SET_WOLF, "WOLF", SettingType::TOGGLE, 0, 1, 1, "", "RANDOM WOLF VISITOR ON/OFF"},
     {SET_FRUIT_TREES, "FRUIT TREES", SettingType::TOGGLE, 0, 1, 1, "", "RANDOM FRUIT TREES + DROPS"},
@@ -289,6 +289,9 @@ static const char* getSkyModeLabel(int idx) {
 
 static const char* getPigSkinLabel(int idx) {
     if (idx < 0 || idx >= (int)PIG_SKIN_COUNT) return kPigSkinLabels[0];
+    if (idx == (int)PigSkin::ZOMBIE && !Config::isZombieSkinUnlocked()) {
+        return "ZOMBIE?";  // locked
+    }
     return kPigSkinLabels[idx];
 }
 
@@ -756,8 +759,16 @@ static bool setSettingValue(SettingId id, int value) {
         case SET_PIG_SKIN: {
             uint8_t newVal = static_cast<uint8_t>(value);
             if (newVal >= PIG_SKIN_COUNT) newVal = 0;
+            // ZOMBIE locked until 3 night wolf bites
+            if (newVal == (uint8_t)PigSkin::ZOMBIE && !Config::isZombieSkinUnlocked()) {
+                Display::showToast("ZOMBIE LOCKED — 3 NIGHT BITES", 2000);
+                return false;
+            }
             if (Config::personality().pigSkin == newVal) return false;
             Config::personality().pigSkin = newVal;
+            if (newVal == (uint8_t)PigSkin::ZOMBIE) {
+                Display::showToast("ZOMBIE — WOLF WON'T BITE", 1600);
+            }
             return true;
         }
         case SET_SEASON: {
@@ -1368,6 +1379,13 @@ void SettingsMenu::handleInput() {
                 int current = getSettingValue(id);
                 int next = current + (up ? step : -step);
                 next = clampValue(next, minVal, maxVal);
+                // Skip locked ZOMBIE when cycling skins
+                if (id == SET_PIG_SKIN &&
+                    next == (int)PigSkin::ZOMBIE &&
+                    !Config::isZombieSkinUnlocked()) {
+                    next = clampValue(next + (up ? step : -step), minVal, maxVal);
+                    Display::showToast("ZOMBIE LOCKED — 3 NIGHT BITES", 1600);
+                }
                 if (setSettingValue(id, next)) {
                     if (isPersonalitySetting(id)) dirtyPersonality = true;
                     if (isConfigSetting(id)) dirtyConfig = true;

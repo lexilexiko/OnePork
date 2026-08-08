@@ -1749,7 +1749,50 @@ void Display::showBootSplash() {
 
     bootSplashDelay(700);
 
-    // Screen 4 (optional): Welcome back when callsign is set
+    // Screen 4: NEW feature — pWnCrack
+    M5.Display.fillScreen(COLOR_BG);
+    M5.Display.setTextDatum(middle_center);
+    M5.Display.setTextSize(2);
+    M5.Display.setTextColor(COLOR_ACCENT);
+    M5.Display.drawString("N3W: PWNCRACK", DISPLAY_W / 2, DISPLAY_H / 2 - 28);
+    M5.Display.setTextColor(COLOR_FG);
+    M5.Display.setTextSize(1);
+    M5.Display.drawString("pwncrack.org  GPU CR4CK", DISPLAY_W / 2, DISPLAY_H / 2 - 8);
+    M5.Display.drawString("LOOT > PWNCRACK", DISPLAY_W / 2, DISPLAY_H / 2 + 6);
+    M5.Display.drawString("!= WPA-SEC (HASHES)", DISPLAY_W / 2, DISPLAY_H / 2 + 18);
+    M5.Display.drawString("S=SYNC  T=TEST  R=KEY", DISPLAY_W / 2, DISPLAY_H / 2 + 34);
+    bootSplashDelay(900);
+
+    // Screen 5: how to set up pwncrack
+    M5.Display.fillScreen(COLOR_BG);
+    M5.Display.setTextDatum(middle_center);
+    M5.Display.setTextSize(2);
+    M5.Display.setTextColor(COLOR_ACCENT);
+    M5.Display.drawString("S3TUP PWN", DISPLAY_W / 2, DISPLAY_H / 2 - 32);
+    M5.Display.setTextColor(COLOR_FG);
+    M5.Display.setTextSize(1);
+    M5.Display.drawString("1. KEY FROM pwncrack.org", DISPLAY_W / 2, DISPLAY_H / 2 - 12);
+    M5.Display.drawString("2. SD: m5porkchop/pwncrack/", DISPLAY_W / 2, DISPLAY_H / 2 + 2);
+    M5.Display.drawString("   key.txt   then press R", DISPLAY_W / 2, DISPLAY_H / 2 + 14);
+    M5.Display.drawString("3. OINK first  (.22000)", DISPLAY_W / 2, DISPLAY_H / 2 + 28);
+    M5.Display.drawString("4. HOME WIFI = OTA SSID", DISPLAY_W / 2, DISPLAY_H / 2 + 40);
+    bootSplashDelay(1000);
+
+    // Screen 6: ZOMBIE skin teaser
+    M5.Display.fillScreen(COLOR_BG);
+    M5.Display.setTextDatum(middle_center);
+    M5.Display.setTextSize(2);
+    M5.Display.setTextColor(COLOR_ACCENT);
+    M5.Display.drawString("UND3AD?", DISPLAY_W / 2, DISPLAY_H / 2 - 28);
+    M5.Display.setTextColor(COLOR_FG);
+    M5.Display.setTextSize(1);
+    M5.Display.drawString("ZOMBIE SKIN IS LOCKED", DISPLAY_W / 2, DISPLAY_H / 2 - 6);
+    M5.Display.drawString("WOLF BITES YOU AT NIGHT", DISPLAY_W / 2, DISPLAY_H / 2 + 8);
+    M5.Display.drawString("3 TIMES → UNLOCK ZOMBIE", DISPLAY_W / 2, DISPLAY_H / 2 + 20);
+    M5.Display.drawString("ZOMBIE = WOLF WON'T BITE", DISPLAY_W / 2, DISPLAY_H / 2 + 36);
+    bootSplashDelay(900);
+
+    // Screen 7 (optional): Welcome back when callsign is set
     const char* cs = Config::personality().callsign;
     if (cs[0] != '\0') {
         M5.Display.fillScreen(COLOR_BG);
@@ -3219,7 +3262,7 @@ void Display::drawAboutScreen(M5Canvas& canvas) {
     canvas.setTextColor(UiStyle::CYAN);
     canvas.drawString("G1THUB.COM/LEXILEXIKO/0N3P0RK", DISPLAY_W / 2, 64);
     canvas.setTextColor(COLOR_FG);
-    canvas.drawString("1R·FRU1T·S3AS0N·RANK RPG", DISPLAY_W / 2, 76);
+    canvas.drawString("PWNCRACK·1R·FRU1T·ZOMBIE?", DISPLAY_W / 2, 76);
     
     // Random quote
     canvas.setTextColor(COLOR_FG);

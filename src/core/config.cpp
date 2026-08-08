@@ -823,6 +823,17 @@ bool Config::loadPersonality() {
     uint8_t pig = doc["pigSkin"] | 0;
     if (pig >= PIG_SKIN_COUNT) pig = 0;
     personalityConfig.pigSkin = pig;
+    personalityConfig.nightWolfBites = doc["nightWolfBites"] | 0;
+    if (personalityConfig.nightWolfBites > 3) personalityConfig.nightWolfBites = 3;
+    personalityConfig.zombieSkinUnlocked = doc["zombieSkinUnlocked"] | false;
+    if (personalityConfig.nightWolfBites >= 3) {
+        personalityConfig.zombieSkinUnlocked = true;
+    }
+    // Locked ZOMBIE cannot stay selected until unlocked
+    if (personalityConfig.pigSkin == (uint8_t)PigSkin::ZOMBIE &&
+        !personalityConfig.zombieSkinUnlocked) {
+        personalityConfig.pigSkin = (uint8_t)PigSkin::CLASSIC;
+    }
     // Prefer seasonMode; migrate legacy grassStyle (0..3 → SUMMER/SPRING/AUTUMN/WINTER)
     if (!doc["seasonMode"].isNull()) {
         uint8_t sm = doc["seasonMode"] | 0;
@@ -888,6 +899,8 @@ void Config::savePersonalityToSPIFFS() {
     doc["dimTimeout"] = personalityConfig.dimTimeout;
     doc["skyMode"] = personalityConfig.skyMode;
     doc["pigSkin"] = personalityConfig.pigSkin;
+    doc["nightWolfBites"] = personalityConfig.nightWolfBites;
+    doc["zombieSkinUnlocked"] = personalityConfig.zombieSkinUnlocked;
     doc["seasonMode"] = personalityConfig.seasonMode;
     doc["animTest"] = personalityConfig.animTest;
     doc["wolfEnabled"] = personalityConfig.wolfEnabled;
@@ -1301,4 +1314,34 @@ bool Config::importCredsFromJsonConf() {
     }
 
     return merged;
+}
+
+bool Config::isZombieSkinUnlocked() {
+    if (personalityConfig.zombieSkinUnlocked) return true;
+    if (personalityConfig.nightWolfBites >= 3) {
+        personalityConfig.zombieSkinUnlocked = true;
+        return true;
+    }
+    return false;
+}
+
+bool Config::registerNightWolfBite() {
+    if (isZombieSkinUnlocked()) {
+        // Already unlocked — still count only for unlock path is done
+        return false;
+    }
+    if (personalityConfig.nightWolfBites < 3) {
+        personalityConfig.nightWolfBites++;
+    }
+    Serial.printf("[CONFIG] Night wolf bite %u/3\n",
+                  (unsigned)personalityConfig.nightWolfBites);
+    if (personalityConfig.nightWolfBites >= 3) {
+        personalityConfig.zombieSkinUnlocked = true;
+        personalityConfig.pigSkin = (uint8_t)PigSkin::ZOMBIE;
+        savePersonalityToSPIFFS();
+        Serial.println("[CONFIG] ZOMBIE skin UNLOCKED");
+        return true;
+    }
+    savePersonalityToSPIFFS();
+    return false;
 }

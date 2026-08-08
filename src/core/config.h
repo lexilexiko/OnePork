@@ -127,7 +127,11 @@ struct PersonalityConfig {
     // 0 = AUTO (RTC or synthetic cycle), 1 = always DAY, 2 = always NIGHT
     uint8_t skyMode = 0;
     // Avatar pig skin: 0=CLASSIC 1=BLUSH 2=HOG 3=ZOMBIE 4=RETRO (B&W film)
+    // ZOMBIE is locked until nightWolfBites >= 3 (wolf bites at night)
     uint8_t pigSkin = 0;
+    // Night-time ambient wolf bites toward ZOMBIE unlock (0..3)
+    uint8_t nightWolfBites = 0;
+    bool zombieSkinUnlocked = false;
     // Season: 0=AUTO (~15 min) 1=SPRING 2=SUMMER 3=AUTUMN 4=WINTER 5=RETRO
     // RETRO = monochrome old-film scene + falling pixels (manual only, not in AUTO)
     uint8_t seasonMode = 0;  // AUTO default
@@ -226,6 +230,11 @@ public:
     static void setBLE(const BLEConfig& cfg);
     static void setPersonality(const PersonalityConfig& cfg);
     static void setC5(const C5Config& cfg);
+
+    // ZOMBIE skin: locked until 3 night wolf bites (ambient IDLE, not Fruit Run)
+    static bool isZombieSkinUnlocked();
+    // Returns true if this bite unlocked ZOMBIE (first time)
+    static bool registerNightWolfBite();
     
 private:
     static GPSConfig gpsConfig;

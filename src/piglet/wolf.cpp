@@ -258,13 +258,18 @@ static void updateActor(Actor& w, uint32_t now) {
 
             float adx = dx < 0 ? -dx : dx;
             if (adx < (float)SCARE_DIST) {
-                if (pigSitting) {
-                    // Hide / freeze — wolf loses interest and walks past
+                // ZOMBIE pig — undead; wolf will not bite (walks past)
+                const bool zombiePig =
+                    (Config::personality().pigSkin == (uint8_t)PigSkin::ZOMBIE);
+                if (pigSitting || zombiePig) {
+                    // Hide / freeze / undead — wolf loses interest and walks past
                     w.phase = Phase::LEAVE;
                     w.phaseStartMs = now;
                     if (w.faceRight) w.vx = LEAVE_SPEED * 0.95f;
                     else             w.vx = -LEAVE_SPEED * 0.95f;
-                    XP::addXP(XPEvent::WOLF_HIDE);
+                    if (pigSitting) {
+                        XP::addXP(XPEvent::WOLF_HIDE);
+                    }
                 } else {
                     w.phase = Phase::SCARE;
                     w.phaseStartMs = now;

@@ -1,223 +1,178 @@
-# One Pork — fan build notes
+# One Pork — what appeared (fan package)
 
-**Version: v0.1.8c (1.6)**  
-- `0.1.8c` — last known upstream M5PORKCHOP base  
-- `(1.6)` — One Pork fan package — **pwncrack.org**
+This file is the **changelog of fan work** on top of upstream **M5PORKCHOP**.
 
-This tree is a **fan / community packaging** of **M5PORKCHOP**.
+| | |
+|--|--|
+| **Current** | **v0.1.8c (1.6)** pWnCrack |
+| **Upstream base** | 0.1.8c |
+| **Main README** | [README.md](README.md) — install, bugs table, how to report |
+| **Release notes 1.6** | [releases/RELEASE_NOTES_1.6.md](releases/RELEASE_NOTES_1.6.md) |
 
-## Credits & donations (read this first)
+---
+
+## Credits
 
 | Who | Role |
 |-----|------|
-| **0ct0** | **Original author** of M5PORKCHOP. Owner of the barn. |
-| **Donate to the creator** | **https://buymeacoffee.com/0ct0** |
-| Fan packaging (this fork) | **lexilexiko** — fan only. Not the original author. |
+| **0ct0** | Original M5PORKCHOP — **donate:** https://buymeacoffee.com/0ct0 |
+| **lexilexiko** | Fan packaging only |
 
-If you like the pig, **donate to 0ct0**, not to the fan who only polished the straw.
-
-Upstream / releases: https://github.com/0ct0sec/M5PORKCHOP  
-This fan repo: https://github.com/lexilexiko/OnePork  
-License: MIT — Copyright (c) 2025 **0ct0** (`LICENSE`).
+Upstream: https://github.com/0ct0sec/M5PORKCHOP  
+Fan: https://github.com/lexilexiko/OnePork  
 
 ---
 
-## What ships in this fan tree (device firmware)
+## What the fan package adds (big picture)
 
-**Built for the device** (`pio run -e m5cardputer`):
+Not a rewrite of the barn — **extra straw**:
 
-- `src/` — all firmware (core, modes, piglet avatar, UI, web)
-- `platformio.ini` — `m5cardputer` + `m5cardputer-debug`
-- `scripts/pre_build.py` — version stamp at build
-- `scripts/build_release.py` — optional release packaging
-- `partitions.csv`, `sdkconfig.defaults`
-- `patches/` — reference patch (not auto-applied every build)
-- `.github/workflows/build.yml` — CI build of firmware
-- `README.md`, `LICENSE`, this file
-- `sd_template/ir/` — sample custom IR code file format
-
-**Not in git / not for the repo** (secrets / local junk):
-
-- `.pio/` build output  
-- `Passworld/` wordlists  
-- `data/config.json` (local prefs / keys)  
+- Scene: seasons, trees, wolf, RETRO film world, monologue timing  
+- Games / toys: Fruit Run, 1RP0RK (IR), RANK / FLEXES / GR1ND XP  
+- Cloud: WPA-SEC (upstream-style) + **pwncrack.org** (1.6, separate)  
+- Skins: CLASSIC / BLUSH / HOG / **ZOMBIE** (unlock) / RETRO  
+- Packaging: One Pork branding, auto-OINK warm-up, prebuilt bins under `releases/`
 
 ---
 
-## v1.6 changelog (latest) — pWnCrack
+## v1.6 — pWnCrack + undead pig
 
-### New
+### Appeared
 
-- **PWNCRACK** — client for [pwncrack.org](https://pwncrack.org/) (not WPA-SEC)
-  - LOOT menu + Integrations key (`/m5porkchop/pwncrack/key.txt`)
-  - HASHES-style list: SSID / ST / TYPE / SIZE · Enter = password if cracked
-  - **S** upload+potfile · **T** net diagnostic · **R** key · **C** clear upload log
-  - Upload renames to `.hc22000` in HTTP only (SD stays `.22000`)
-- Bottom-bar control hints for PWNCRACK
+| Item | Description |
+|------|-------------|
+| **PWNCRACK** | Client for [pwncrack.org](https://pwncrack.org/) — separate from WPA-SEC / HASHES |
+| Menu | LOOT → PWNCRACK; Integrations key status |
+| Key path | `/m5porkchop/pwncrack/key.txt` (→ `.imported` after load) |
+| UI | SSID · ST `[--]/[..]`/`[OK]` · TYPE · SIZE · Enter password |
+| Keys | **S** sync · **T** net test · **R** key · **C** clear upload log |
+| Upload | HTTP multipart; filename as `.hc22000` in request only |
+| Boot splash | “NEW: PWNCRACK” + setup steps + ZOMBIE teaser |
+| **ZOMBIE skin** | Locked until **3 night wolf bites**; auto-equip on unlock; wolf ignores zombie pig |
+| Docs | Honest bugs table in main README |
 
-### Known bugs (shipped intentionally)
+### Not shipped (tried, rejected)
 
-Rare **reboot** when opening PWNCRACK right after **HASHES/WPA-SEC** or **XFER**
-(heap/radio). **After reboot, everything works** — preferred over “radio
-borrow” patches that broke STA internet. Full workarounds: `releases/RELEASE_NOTES_1.6.md`.
-
-### Still from 1.4.6 / 1.4.5
-
-Auto-OINK + 1.3 radio kludge, RETRO, SCENE lab, G0 quiet dark, IR/Fruit/RANK/XP, etc.
-
----
-
-## v1.4.6 changelog — radio kludge / fix
-
-### The hard problem
-
-ESP32-S3: OINK promisc, BLUES (NimBLE), and STA+TLS (XFER / WPA-SEC) share one
-radio and a tiny heap. “Correct” exclusive handoffs kept fixing one path and
-breaking another (including hard resets on failed `reserve`).
-
-### Workaround (works for us)
-
-- **NetworkRecon / BLUES radio** restored to the **known-good 1.3 pattern**
-- **Auto-OINK ~5s after boot** (OINK bounce warm-up) so net/BLE behave without
-  a manual OINK first; default BOOT MODE = OINK; old NVS IDLE → still warm OINK
-
-Not pretty. Ship it while it works.
-
-### Still from 1.4.5
-
-RETRO, SCENE lab, G0 quiet dark, IR/Fruit/RANK/XP, etc.
+“Radio borrow/restore” after XFER/HASHES — reduced some reboots but **broke home WiFi connect**.  
+1.6 keeps rare reboot; see bugs **B01–B09** in [README.md](README.md).
 
 ---
 
-## v1.4.5 changelog
+## v1.4.6 — radio kludge
 
-### New
+### Problem
 
-- **RETRO season + pig skin** — black & white film world (pixel rain, mono trees/bushes/bars/clouds)
-- **SCENE lab** (settings) — toggle sky / grass / trees / pig / weather / season FX / mood / wolf
-- **CPU HUD** — frame load % + ms in top bar free slot (lab only)
-- IR **sparkle-storm** anim + **IR_FIRE** SFX (no radio-ring waves)
-- Wolf only on **IDLE** / **Fruit Run** (not O/W/B/D work modes)
-- SFX layering: low-priority drop, IR mute during TX
+OINK promisc + BLUES (NimBLE) + STA/TLS (XFER, WPA-SEC) share one radio and a fragmented heap.  
+“Clean” handoffs fixed one path and broke another (`reserve` → reboot).
 
-### Fixed
+### What appeared / stayed
 
-- **[B] BLUES** hard-reset on **exit after OINK**  
-  - Root cause: `NetworkRecon` re-reserved ~19KB table while NimBLE still held ~20–30KB  
-  - With exceptions off, failed `vector::reserve` → `abort()` → reboot  
-  - Fix: **`WiFiUtils::releaseBleStack()` first**, then probe-safe re-reserve, then promisc  
-  - Same handoff used on BLUES stop, recon start/resume, charging
-- CPU HUD no longer crowded on bottom bar
+| Item | Description |
+|------|-------------|
+| **1.3-style** NetworkRecon / BLUES handoff | Known-good pattern restored |
+| **Auto-OINK ~5s** after boot | Heap/radio warm-up without manual OINK first |
+| Default **BOOT MODE = OINK** | NVS IDLE still can warm with OINK |
 
-### From 1.4 / 1.4.1 (still in tree)
-
-- 1RP0RK, Fruit Run, RANK/GR1ND, fan XP + ST4TS, seasons, EvilPig portal fix, cold-start BLUES freeNetworks
+Kludge — but usable on real hardware.
 
 ---
 
-## v1.4 / 1.4.1 changelog (history)
+## v1.4.5
+
+| Item | Description |
+|------|-------------|
+| **RETRO** season + pig skin | B&W film world, pixel rain |
+| **SCENE lab** | Toggle sky/grass/trees/pig/weather/FX/mood/wolf |
+| **CPU HUD** | Load % in top bar (lab) |
+| IR sparkle-storm + IR_FIRE SFX | |
+| Wolf only IDLE / Fruit Run | Not on O/W/B/D work modes |
+| BLUES exit after OINK | Mitigated hard-reset (BLE release + safe reserve) |
+| G0 quiet dark | Screen-off parks scene + mute (quiet feature) |
+
+---
+
+## v1.4 / 1.4.1
 
 ### New (1.4)
 
-- **1RP0RK [I]** — IR power blaster (builtin N4/EU packs + custom `/ir/*.txt` on SD)
-- **FRUITRUN [G]** — orchard mini-game (goal, lives, wolf pressure)
-- **RANK hub** — FLEXES / BADGES / UNLOCK / FRUITRUN (DEMANDS stays on hotkey **1**)
-- **FLEXES → GR1ND tab** — what to do for XP so pig LVL goes up
-- **Fan XP + ST4TS** — fruit / wolf scare+hide / PigPass crack / EvilPig catch (NVS)
-- **Seasons** — spring cherry, summer apple, autumn old apple, winter fir + FX
-- **Wolf / trees / monologue polish** (5s show → 15s silence)
-- **Boot / About** — One Pork branding + version stamp
-
-### Fixed (1.4)
-
-- **BLUES [B]** cold start hard-reset/black screen: stop NetworkRecon **and free networks table** (~19KB) before NimBLE (OINK-handoff class fix)
-- IR TX mutes speaker during blast (less piezo glitch)
-- Scene suspend stays on heavy CPU modes (PigPass / EvilPig / Xfer)
+| Item | Description |
+|------|-------------|
+| **1RP0RK [I]** | IR power blaster — builtin N4/EU + `/ir/*.txt` on SD |
+| **FRUITRUN [G]** | Orchard mini-game — goal, lives, wolves |
+| **RANK hub** | FLEXES / BADGES / UNLOCK / FRUITRUN |
+| **GR1ND** tab | What to do for XP |
+| Fan XP / ST4TS | Fruit, wolf scare/hide, PigPass, EvilPig (NVS) |
+| Seasons | Spring cherry / summer apple / autumn / winter fir + FX |
+| Boot / About | One Pork branding |
 
 ### Fixed (1.4.1)
 
-- **EVILPIG [E]** captive portal auto-open on phones again  
-  - probes (`/generate_204`, `/hotspot-detect.html`, etc.) return **portal HTML 200** (not “online”)  
-  - fixed gateway **192.168.4.1**, DNS wildcard + TTL 0, multi-pump DNS+HTTP  
-  - `Connection: close` + no-cache headers  
+| Item | Description |
+|------|-------------|
+| **EVILPIG portal** | Captive portal auto-open on phones again |
 
-### Notes
+### Fixed (1.4)
 
-- Donate **0ct0** first: https://buymeacoffee.com/0ct0  
-- Fan packaging only: lexilexiko
+| Item | Description |
+|------|-------------|
+| BLUES cold start | Free networks table before NimBLE |
+| IR TX | Mute speaker during blast |
+| Scene suspend | Heavy modes park pig scene |
 
 ---
 
-## Fan features on top of upstream M5PORKCHOP
+## Scene / piglet (fan stack)
 
-### Scene / piglet
+- Multi-kind trees: fruit / decor / berry + seasonal species  
+- Wolf: chase, bite, sit = pass, stomp scare  
+- Seasonal FX: snow path, leaves, butterflies, lightning, RETRO pixels  
+- Monologue: ~5s on → silence → next  
+- Free-roam walk / jump / sit / play-dead on IDLE  
+- Scene suspend during PigPass / EvilPig / Xfer / WPA-SEC / WiGLE  
 
-- Multi-kind **trees** (`trees` + `trees_drops`) — fruit / decor / berry
-- Seasonal trees: spring **cherry**, summer **apple**, autumn **old apple**, winter **fir**, **RETRO** mono film trees
-- Seasonal produce: cherries, red apples, green apples, cones, berries
-- Fallen fruit scrolls with the world + foreground drops
-- **Wolf** visitor: chase, bite, sit = peaceful pass-by, stomp/scare (IDLE / Fruit Run only)
-- Seasonal FX: snow banks + **trample path**, autumn leaves + tumbleweed, summer butterflies + pollen, spring lightning, **RETRO pixel rain**
-- Quiet **RAIN_TICK** SFX; **WOLF_HIT** yelp; **IR_FIRE**
-- Monologue bubble: **5s on screen → gone → 15s silence → next line**
-- Free-roam walk / jump / sit / play-dead on IDLE
-- Scene **suspend** during PigPass / EvilPig / Xfer / WPA-SEC / WiGLE
-- **SceneLayers** test lab + CPU HUD (runtime toggles, not NVS)
+---
 
-### Modes
+## Menu map (fan)
 
-| Key / menu | Mode | Notes |
-|------------|------|--------|
-| **G** / RANK→FRUITRUN | Fruit Run | Goal, lives, wolf scales |
-| **I** / ATTACK→1RP0RK | IR PORK | Builtin N4/EU power packs, custom `/ir/*.txt` |
-| **S** / RANK→FLEXES | Flexes | LVL, XP, ST4TS / B00ST / **GR1ND** / W1GL3 |
-| RANK→**DEMANDS** | Challenges | Same as hotkey **1** — session trials + XP |
-| RANK→BADGES / UNLOCK | Achievements / unlockables | Street cred |
-| **B** / ATTACK→BLUES | Piggy Blues | BLE spam; radio handoff frees recon table + BLE release on exit |
-
-### Menus (RPG map)
-
-```
+```text
 MENU → RANK
-  FLEXES    [S]   XP / LVL / T13R / ST4TS / B00ST / GR1ND / W1GL3
-  DEMANDS   [1]   session challenges (P1G D3M4NDS)
-  BADGES          achievements
-  UNLOCK          secret unlockables
-  FRUITRUN  [G]   orchard mini-game
+  FLEXES   [S]   XP / LVL / ST4TS / GR1ND / …
+  DEMANDS  [1]   session challenges
+  BADGES / UNLOCK
+  FRUITRUN [G]
 
 MENU → ATTACK
-  OINKS, BLUES, EVILPIG, 1RP0RK [I]
+  OINK, BLUES, EVILPIG, 1RP0RK [I]
+
+MENU → LOOT
+  HASHES     (WPA-SEC)
+  PWNCRACK   (pwncrack.org)   ← 1.6
+  TRACKS     (WiGLE)
 ```
 
-### IR custom file (SD)
+---
 
-Put files under `/ir/` on the SD card, e.g. `extra_power.txt`:
+## IR custom files
+
+Path: `/ir/*.txt` on SD, e.g.:
 
 ```text
 # PROTO ADDR CMD [name]
 NEC 0x00FF 0x45 MyNEC
 SAMSUNG 0xE0E0 0x40BF SamsungTV
-SONY 0xA90 12 Sony12
 ```
 
-In 1RP0RK: **E** = pick file, **SPC** = fire, **R** = N4/EU region, **B** = builtin pack.
-
-### Packaging cleanup
-
-- Removed host `test/` tree and unused `native` PlatformIO envs
-- SCAN DEFERRED soft heap gate on Hashes/Tracks
-- Tightened `.gitignore`
+In 1RP0RK: **E** file · **SPC** fire · **R** region · **B** builtin.
 
 ---
 
-## Install firmware (no build)
+## Prebuilt binary
 
-Prebuilt binary (when shipped):
+```text
+releases/OnePork_v0.1.8c-1.6_m5cardputer_firmware.bin
+```
 
-- `releases/OnePork_v0.1.8c-1.6_m5cardputer_firmware.bin`
-
-Flash with M5 Launcher / M5Burner / `esptool`.  
-XP is kept if you update via M5 Launcher (do not wipe NVS).
+Flash: M5 Launcher (prefer) / M5Burner / esptool.
 
 ## Build
 
@@ -225,3 +180,12 @@ XP is kept if you update via M5 Launcher (do not wipe NVS).
 pio run -e m5cardputer
 pio run -t upload -e m5cardputer
 ```
+
+---
+
+## Report bugs
+
+See the **bugs table** and report template in **[README.md](README.md)**  
+→ https://github.com/lexilexiko/OnePork/issues  
+
+Clear steps + version help more than “broken”.

@@ -1,24 +1,26 @@
-# Prebuilt firmware (One Pork)
+# Prebuilt firmware
 
-**Version:** v0.1.8c (1.6) — **pWnCrack**  
-**File:** `OnePork_v0.1.8c-1.6_m5cardputer_firmware.bin`  
-**Target:** M5Cardputer (ESP32-S3 StampS3)
+| | |
+|--|--|
+| **Version** | v0.1.8c **(1.6)** — pWnCrack |
+| **File** | [`OnePork_v0.1.8c-1.6_m5cardputer_firmware.bin`](OnePork_v0.1.8c-1.6_m5cardputer_firmware.bin) |
+| **Target** | M5Cardputer (ESP32-S3) |
 
 ## Install
 
-1. Download the `.bin` from this folder (or the GitHub Release).
-2. Flash with **M5 Launcher** (recommended — keeps XP in NVS) or M5Burner / esptool.
-3. Reboot — ~5s auto **OINK** warm-up, then loot / pwncrack.
+1. Download the `.bin`  
+2. Flash with **M5 Launcher** (keeps XP) or M5Burner / esptool  
+3. Reboot — auto-OINK warm-up ~5s  
 
-## 1.6 highlight
+## Docs
 
-- **PWNCRACK** — pwncrack.org client (separate from WPA-SEC)  
-- Full notes + **known bugs / workarounds:** `RELEASE_NOTES_1.6.md`
+| File | Role |
+|------|------|
+| [RELEASE_NOTES_1.6.md](RELEASE_NOTES_1.6.md) | 1.6 details + workarounds |
+| [../README.md](../README.md) | Fan front door + **bugs table** + how to report |
+| [../FAN.md](../FAN.md) | What appeared (fan changelog) |
 
 ## Credits
 
-- **Original author:** 0ct0 — donate: https://buymeacoffee.com/0ct0  
-- **Fan packaging:** lexilexiko only (not the author)
-
-Upstream: https://github.com/0ct0sec/M5PORKCHOP  
-Fan repo: https://github.com/lexilexiko/OnePork
+- **0ct0** — original M5PORKCHOP — donate: https://buymeacoffee.com/0ct0  
+- **lexilexiko** — fan packaging only  

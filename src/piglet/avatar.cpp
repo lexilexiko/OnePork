@@ -2785,6 +2785,24 @@ void Avatar::setPlayDead(bool on) {
 bool Avatar::isPlayDead() { return s_playDead; }
 
 void Avatar::onWolfBitten() {
+    // ZOMBIE skin is immune (wolf should already walk past — belt and suspenders)
+    if (Config::personality().pigSkin == (uint8_t)PigSkin::ZOMBIE) {
+        return;
+    }
+
+    // Night ambient bites unlock ZOMBIE (3 times). Not Fruit Run.
+    if (!FruitRunMode::isRunning() && isNightTime()) {
+        if (Config::registerNightWolfBite()) {
+            Display::showToast("ZOMBIE SKIN UNLOCKED!", 2500);
+            Display::notify(NoticeKind::REWARD, "UND3AD P1G", 4000, NoticeChannel::TOP_BAR);
+        } else if (!Config::isZombieSkinUnlocked()) {
+            char buf[28];
+            snprintf(buf, sizeof(buf), "NIGHT BITE %u/3",
+                     (unsigned)Config::personality().nightWolfBites);
+            Display::showToast(buf, 1800);
+        }
+    }
+
     // Play-dead + control lock. Shorter in Fruit Run (lives handle death).
     uint32_t lockMs = kWolfBiteLockMs;
     if (FruitRunMode::isRunning()) lockMs = 1800;  // brief stun, not 10s
