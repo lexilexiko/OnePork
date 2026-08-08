@@ -38,6 +38,7 @@ enum class PorkchopMode : uint8_t {
     FILES_MODE = 28,       // SD + SPIFFS file browser / delete
     FRUIT_RUN_MODE = 29,   // Mini-game: jump & collect fallen fruit (Chrome dino vibes)
     IR_PORK_MODE = 30,     // IR blaster — power brute + custom SD files (hotkey I)
+    PWNCRACK_MODE = 31,    // pwncrack.org cloud crack (separate from WPA-SEC)
 
     // Legacy aliases (deprecated; remove in v0.2.0)
     CAPTURES = HASHES,

@@ -8,7 +8,9 @@
 #include <SD.h>
 #include <SPIFFS.h>
 #include <SPI.h>
+#include <Preferences.h>
 #include <driver/gpio.h>
+#include <ctype.h>
 
 // ---- Cardputer microSD wiring (explicit, per Cardputer v1.1 schematic) ----
 // ESP32-S3FN8:
@@ -419,6 +421,13 @@ bool Config::init() {
     // Try to load keys from files (auto-deletes after import)
     if (loadWpaSecKeyFromFile()) {
         Serial.println("[CONFIG] WPA-SEC key loaded from file");
+    }
+    // Pwncrack key lives in NVS (not binary config blob)
+    if (reloadPwncrackKeyFromNvs()) {
+        Serial.println("[CONFIG] Pwncrack key loaded from NVS");
+    }
+    if (loadPwncrackKeyFromFile()) {
+        Serial.println("[CONFIG] Pwncrack key loaded from SD file");
     }
     if (loadWigleKeyFromFile()) {
         Serial.println("[CONFIG] WiGLE API keys loaded from file");
@@ -1036,6 +1045,124 @@ bool Config::loadWpaSecKeyFromFile() {
         Serial.println("[CONFIG] Warning: Could not delete WPA-SEC key file");
     }
 
+    return true;
+}
+
+bool Config::loadPwncrackKeyFromFile() {
+    // Accept several paths; do NOT hard-delete key.txt (rename to *.imported)
+    // so the user can see it was processed — previous auto-delete looked like "key vanished".
+    const char* candidates[] = {
+        SDLayout::pwncrackKeyPath(),
+        "/m5porkchop/pwncrack/key.txt",
+        "/m5porkchop/pwncrack/key.txt.imported",  // after previous import
+        "/m5porkchop/pwncrack/pwncrack_key.txt",
+        SDLayout::legacyPwncrackKeyPath(),
+        "/pwncrack_key.txt",
+        "/pwncrack_key.txt.imported",
+        "/pwncrack/key.txt",
+    };
+
+    if (!sdAvailable) {
+        Serial.println("[CONFIG] Pwncrack key: no SD");
+        return false;
+    }
+
+    const char* keyFile = nullptr;
+    for (const char* c : candidates) {
+        if (c && SD.exists(c)) {
+            keyFile = c;
+            break;
+        }
+    }
+    if (!keyFile) {
+        Serial.println("[CONFIG] Pwncrack key file not found");
+        return false;
+    }
+
+    File f = SD.open(keyFile, FILE_READ);
+    if (!f) {
+        Serial.printf("[CONFIG] Failed to open Pwncrack key: %s\n", keyFile);
+        return false;
+    }
+    char key[80];
+    size_t keyLen = f.readBytesUntil('\n', key, sizeof(key) - 1);
+    key[keyLen] = '\0';
+    f.close();
+
+    // UTF-8 BOM
+    if (keyLen >= 3 && (uint8_t)key[0] == 0xEF && (uint8_t)key[1] == 0xBB && (uint8_t)key[2] == 0xBF) {
+        memmove(key, key + 3, keyLen - 2);
+        keyLen -= 3;
+    }
+    while (keyLen > 0 && (key[keyLen - 1] == '\r' || key[keyLen - 1] == ' ' || key[keyLen - 1] == '\t')) {
+        key[--keyLen] = '\0';
+    }
+    // leading spaces
+    size_t start = 0;
+    while (start < keyLen && (key[start] == ' ' || key[start] == '\t')) start++;
+    if (start > 0) {
+        memmove(key, key + start, keyLen - start + 1);
+        keyLen -= start;
+    }
+    if (strncmp(key, "key=", 4) == 0 || strncmp(key, "KEY=", 4) == 0) {
+        memmove(key, key + 4, keyLen - 3);
+        keyLen = strlen(key);
+    }
+    // Min 4 — pwncrack keys are not always 32-hex like WPA-SEC
+    if (keyLen < 4 || keyLen >= sizeof(wifiConfig.pwncrackKey)) {
+        Serial.printf("[CONFIG] Invalid Pwncrack key length: %d (need 4..%u) file=%s\n",
+                      (int)keyLen, (unsigned)(sizeof(wifiConfig.pwncrackKey) - 1), keyFile);
+        return false;
+    }
+    for (size_t i = 0; i < keyLen; i++) {
+        if ((unsigned char)key[i] < 0x20 || (unsigned char)key[i] > 0x7E) {
+            Serial.printf("[CONFIG] Invalid Pwncrack key char at %u\n", (unsigned)i);
+            return false;
+        }
+    }
+
+    strncpy(wifiConfig.pwncrackKey, key, sizeof(wifiConfig.pwncrackKey) - 1);
+    wifiConfig.pwncrackKey[sizeof(wifiConfig.pwncrackKey) - 1] = '\0';
+
+    // Persist in NVS (survives reboot; not in binary config blob)
+    Preferences prefs;
+    if (prefs.begin("pwncrack", false)) {
+        size_t n = prefs.putString("key", wifiConfig.pwncrackKey);
+        prefs.end();
+        Serial.printf("[CONFIG] Pwncrack key saved to NVS (%u bytes written)\n", (unsigned)n);
+        if (n == 0) {
+            Serial.println("[CONFIG] WARNING: NVS putString returned 0");
+        }
+    } else {
+        Serial.println("[CONFIG] WARNING: NVS pwncrack namespace open failed");
+    }
+
+    // If already *.imported — keep it. Else rename key.txt → key.txt.imported
+    if (!strstr(keyFile, ".imported")) {
+        char importedPath[96];
+        snprintf(importedPath, sizeof(importedPath), "%s.imported", keyFile);
+        SD.remove(importedPath);
+        if (SD.rename(keyFile, importedPath)) {
+            Serial.printf("[CONFIG] Pwncrack key imported, renamed to %s\n", importedPath);
+        } else {
+            Serial.printf("[CONFIG] Pwncrack key imported (kept %s)\n", keyFile);
+        }
+    } else {
+        Serial.printf("[CONFIG] Pwncrack key re-loaded from %s\n", keyFile);
+    }
+    SDLog::log("CFG", "Pwncrack key OK in NVS");
+    return true;
+}
+
+// Reload key from NVS into RAM (call on menu open)
+bool Config::reloadPwncrackKeyFromNvs() {
+    Preferences prefs;
+    if (!prefs.begin("pwncrack", true)) return false;
+    String k = prefs.getString("key", "");
+    prefs.end();
+    if (k.length() < 4 || k.length() >= (int)sizeof(wifiConfig.pwncrackKey)) return false;
+    strncpy(wifiConfig.pwncrackKey, k.c_str(), sizeof(wifiConfig.pwncrackKey) - 1);
+    wifiConfig.pwncrackKey[sizeof(wifiConfig.pwncrackKey) - 1] = '\0';
     return true;
 }
 

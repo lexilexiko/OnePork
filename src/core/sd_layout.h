@@ -21,6 +21,7 @@ namespace SDLayout {
     const char* screenshotsDir();
     const char* diagnosticsDir();
     const char* wpaSecDir();
+    const char* pwncrackDir();
     const char* wigleDir();
     const char* xpDir();
     const char* miscDir();
@@ -44,6 +45,9 @@ namespace SDLayout {
     const char* heapLogPath();
     const char* heapWatermarksPath();
     const char* wpasecKeyPath();
+    const char* pwncrackKeyPath();
+    const char* pwncrackResultsPath();
+    const char* pwncrackUploadedPath();
     const char* wigleKeyPath();
     const char* pigpassResultsPath();  // cracked passwords cache
     const char* pigpassCheckpointPath();  // brute progress for resume
@@ -53,6 +57,7 @@ namespace SDLayout {
     const char* legacyConfigPath();
     const char* legacyPersonalityPath();
     const char* legacyWpasecKeyPath();
+    const char* legacyPwncrackKeyPath();
     const char* legacyWigleKeyPath();
 
     // Filename helpers

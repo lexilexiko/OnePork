@@ -47,6 +47,7 @@
 #include "boar_bros_menu.h"
 #include "../core/sd_layout.h"
 #include "tracks_menu.h"
+#include "pwncrack_menu.h"
 #include "unlockables_menu.h"
 #include "bounty_menu.h"
 #include "sd_format_menu.h"
@@ -439,6 +440,10 @@ void Display::update() {
             
         case PorkchopMode::HASHES:
             HashesMenu::draw(mainCanvas);
+            break;
+
+        case PorkchopMode::PWNCRACK_MODE:
+            PwncrackMenu::draw(mainCanvas);
             break;
             
         case PorkchopMode::BADGES:
@@ -905,6 +910,10 @@ void Display::drawTopBar() {
             snprintf(modeBuf, sizeof(modeBuf), "L00T (%u)", (unsigned)HashesMenu::getCount());
             modeColor = barFg;
             break;
+        case PorkchopMode::PWNCRACK_MODE:
+            snprintf(modeBuf, sizeof(modeBuf), "PWNCRACK");
+            modeColor = barFg;
+            break;
         case PorkchopMode::BADGES:
             snprintf(modeBuf, sizeof(modeBuf), "PR00F (%u/%u)",
                      (unsigned)XP::getUnlockedCount(), (unsigned)BadgesMenu::TOTAL_ACHIEVEMENTS);
@@ -1243,8 +1252,11 @@ void Display::drawBottomBar() {
         statsBuf[sizeof(statsBuf) - 1] = '\0';
         statsStr = statsBuf;
     } else if (mode == PorkchopMode::HASHES) {
-        // CAPTURES: show selected capture's BSSID
+        // CAPTURES: rotating control hints (ENT:DET S:SYNC …)
         statsStr = HashesMenu::getSelectedBSSID();
+    } else if (mode == PorkchopMode::PWNCRACK_MODE) {
+        // PWNCRACK: same bottom-bar hint style as HASHES/WPA-SEC
+        statsStr = PwncrackMenu::getBottomHint();
     } else if (mode == PorkchopMode::TRACKS) {
         // WIGLE_MENU: show selected file info
         TracksMenu::getSelectedInfo(statsBuf, sizeof(statsBuf));

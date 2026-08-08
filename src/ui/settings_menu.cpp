@@ -40,6 +40,8 @@ enum SettingId : uint8_t {
     SET_WIFI_PASS,
     SET_WPASEC_STATUS,
     SET_WPASEC_LOAD,
+    SET_PWNCRACK_STATUS,
+    SET_PWNCRACK_LOAD,
     SET_WIGLE_NAME_STATUS,
     SET_WIGLE_TOKEN_STATUS,
     SET_WIGLE_LOAD,
@@ -168,7 +170,9 @@ static const EntryData kNetEntries[] = {
 
 static const EntryData kIntegEntries[] = {
     {SET_WPASEC_STATUS, "WPA-SEC", SettingType::TEXT, 0, 0, 0, "", "WPA-SEC.STANEV.ORG KEY"},
-    {SET_WPASEC_LOAD, "KEY LOAD", SettingType::ACTION, 0, 0, 0, "", "READ /WPASEC_KEY.TXT (ROOT|M5PORKCHOP)"},
+    {SET_WPASEC_LOAD, "WPA LOAD", SettingType::ACTION, 0, 0, 0, "", "READ /WPA-SEC/WPASEC_KEY.TXT"},
+    {SET_PWNCRACK_STATUS, "PWNCRACK", SettingType::TEXT, 0, 0, 0, "", "PWNCRACK.ORG KEY (NOT WPA-SEC)"},
+    {SET_PWNCRACK_LOAD, "PWN LOAD", SettingType::ACTION, 0, 0, 0, "", "READ /PWNCRACK/KEY.TXT"},
     {SET_WIGLE_NAME_STATUS, "WGL NAME", SettingType::TEXT, 0, 0, 0, "", "WIGLE.NET API NAME"},
     {SET_WIGLE_TOKEN_STATUS, "WGL TKN", SettingType::TEXT, 0, 0, 0, "", "WIGLE.NET API TOKEN"},
     {SET_WIGLE_LOAD, "WGL LOAD", SettingType::ACTION, 0, 0, 0, "", "READ /WIGLE_KEY.TXT (ROOT|M5PORKCHOP)"}
@@ -425,6 +429,26 @@ static uint32_t getC5BaudForIndex(int index) {
     return kC5BaudRates[index];
 }
 
+static void formatPwncrackStatus(char* out, size_t len) {
+    if (!out || len == 0) return;
+    const char* key = Config::wifi().pwncrackKey;
+    size_t keyLen = strlen(key);
+    if (keyLen == 0) {
+        strncpy(out, "UNSET", len - 1);
+        out[len - 1] = '\0';
+        return;
+    }
+    if (keyLen < 8) {
+        strncpy(out, "SET", len - 1);
+        out[len - 1] = '\0';
+        return;
+    }
+    char tmp[20];
+    snprintf(tmp, sizeof(tmp), "%.3s...%.2s", key, key + keyLen - 2);
+    strncpy(out, tmp, len - 1);
+    out[len - 1] = '\0';
+}
+
 static void formatWpaSecStatus(char* out, size_t len) {
     if (!out || len == 0) return;
     const char* key = Config::wifi().wpaSecKey;
@@ -518,6 +542,9 @@ static void getSettingTextBuf(SettingId id, char* out, size_t len) {
             return;
         case SET_WPASEC_STATUS:
             formatWpaSecStatus(out, len);
+            return;
+        case SET_PWNCRACK_STATUS:
+            formatPwncrackStatus(out, len);
             return;
         case SET_WIGLE_NAME_STATUS:
             formatWigleNameStatus(out, len);
@@ -1423,12 +1450,24 @@ void SettingsMenu::handleInput() {
                 case SettingType::ACTION:
                     if (entry.id == SET_WPASEC_LOAD) {
                         if (Config::loadWpaSecKeyFromFile()) {
-                            Display::notify(NoticeKind::STATUS, "KEY LOADED");
+                            Display::notify(NoticeKind::STATUS, "WPA KEY LOADED");
                         } else if (!Config::isSDAvailable()) {
                             Display::notify(NoticeKind::WARNING, "NO SD CARD");
                         } else if (!SD.exists(SDLayout::wpasecKeyPath()) &&
                                    !SD.exists(SDLayout::legacyWpasecKeyPath()) &&
                                    !SD.exists("/m5porkchop/wpa-sec/wpasec_key.txt")) {
+                            Display::notify(NoticeKind::WARNING, "NO KEY FILE");
+                        } else {
+                            Display::notify(NoticeKind::WARNING, "INVALID KEY");
+                        }
+                    } else if (entry.id == SET_PWNCRACK_LOAD) {
+                        if (Config::loadPwncrackKeyFromFile()) {
+                            Display::notify(NoticeKind::STATUS, "PWN KEY LOADED");
+                        } else if (!Config::isSDAvailable()) {
+                            Display::notify(NoticeKind::WARNING, "NO SD CARD");
+                        } else if (!SD.exists(SDLayout::pwncrackKeyPath()) &&
+                                   !SD.exists(SDLayout::legacyPwncrackKeyPath()) &&
+                                   !SD.exists("/m5porkchop/pwncrack/key.txt")) {
                             Display::notify(NoticeKind::WARNING, "NO KEY FILE");
                         } else {
                             Display::notify(NoticeKind::WARNING, "INVALID KEY");

@@ -25,6 +25,7 @@ static constexpr const char* kNewCrash = "/m5porkchop/crash";
 static constexpr const char* kNewScreenshots = "/m5porkchop/screenshots";
 static constexpr const char* kNewDiagnostics = "/m5porkchop/diagnostics";
 static constexpr const char* kNewWpaSec = "/m5porkchop/wpa-sec";
+static constexpr const char* kNewPwncrack = "/m5porkchop/pwncrack";
 static constexpr const char* kNewWigle = "/m5porkchop/wigle";
 static constexpr const char* kNewXp = "/m5porkchop/xp";
 static constexpr const char* kNewMisc = "/m5porkchop/misc";
@@ -48,6 +49,7 @@ static constexpr const char* kLegacyBoarBros = "/boar_bros.txt";
 static constexpr const char* kLegacyHeapLog = "/heap_log.txt";
 static constexpr const char* kLegacyHeapWatermarks = "/heap_wm.bin";
 static constexpr const char* kLegacyWpasecKey = "/wpasec_key.txt";
+static constexpr const char* kLegacyPwncrackKey = "/pwncrack_key.txt";
 static constexpr const char* kLegacyWigleKey = "/wigle_key.txt";
 static constexpr const char* kLegacyConfigBin = "/porkchop.dat";
 
@@ -65,6 +67,11 @@ static constexpr const char* kNewBoarBros = "/m5porkchop/misc/boar_bros.txt";
 static constexpr const char* kNewHeapLog = "/m5porkchop/diagnostics/heap_log.txt";
 static constexpr const char* kNewHeapWatermarks = "/m5porkchop/diagnostics/heap_wm.bin";
 static constexpr const char* kNewWpasecKey = "/m5porkchop/wpa-sec/wpasec_key.txt";
+static constexpr const char* kNewPwncrackKey = "/m5porkchop/pwncrack/key.txt";
+static constexpr const char* kNewPwncrackResults = "/m5porkchop/pwncrack/results.txt";
+static constexpr const char* kNewPwncrackUploaded = "/m5porkchop/pwncrack/uploaded.txt";
+static constexpr const char* kLegacyPwncrackResults = "/pwncrack_results.txt";
+static constexpr const char* kLegacyPwncrackUploaded = "/pwncrack_uploaded.txt";
 static constexpr const char* kNewWigleKey = "/m5porkchop/wigle/wigle_key.txt";
 static constexpr const char* kNewConfigBin = "/m5porkchop/config/porkchop.dat";
 static constexpr const char* kNewPigpassResults = "/m5porkchop/pigpass/cracked.txt";
@@ -468,6 +475,7 @@ const char* crashDir() { return usingNewLayout() ? kNewCrash : kLegacyCrash; }
 const char* screenshotsDir() { return usingNewLayout() ? kNewScreenshots : kLegacyScreenshots; }
 const char* diagnosticsDir() { return usingNewLayout() ? kNewDiagnostics : "/"; }
 const char* wpaSecDir() { return usingNewLayout() ? kNewWpaSec : "/"; }
+const char* pwncrackDir() { return usingNewLayout() ? kNewPwncrack : "/"; }
 const char* wigleDir() { return usingNewLayout() ? kNewWigle : "/"; }
 const char* xpDir() { return usingNewLayout() ? kNewXp : "/"; }
 const char* miscDir() { return usingNewLayout() ? kNewMisc : "/"; }
@@ -490,6 +498,13 @@ const char* boarBrosPath() { return usingNewLayout() ? kNewBoarBros : kLegacyBoa
 const char* heapLogPath() { return usingNewLayout() ? kNewHeapLog : kLegacyHeapLog; }
 const char* heapWatermarksPath() { return usingNewLayout() ? kNewHeapWatermarks : kLegacyHeapWatermarks; }
 const char* wpasecKeyPath() { return usingNewLayout() ? kNewWpasecKey : kLegacyWpasecKey; }
+const char* pwncrackKeyPath() { return usingNewLayout() ? kNewPwncrackKey : kLegacyPwncrackKey; }
+const char* pwncrackResultsPath() {
+    return usingNewLayout() ? kNewPwncrackResults : kLegacyPwncrackResults;
+}
+const char* pwncrackUploadedPath() {
+    return usingNewLayout() ? kNewPwncrackUploaded : kLegacyPwncrackUploaded;
+}
 const char* wigleKeyPath() { return usingNewLayout() ? kNewWigleKey : kLegacyWigleKey; }
 const char* pigpassResultsPath() {
     return usingNewLayout() ? kNewPigpassResults : kLegacyPigpassResults;
@@ -504,6 +519,7 @@ const char* pigpassLastWordlistPath() {
 const char* legacyConfigPath() { return kLegacyConfig; }
 const char* legacyPersonalityPath() { return kLegacyPersonality; }
 const char* legacyWpasecKeyPath() { return kLegacyWpasecKey; }
+const char* legacyPwncrackKeyPath() { return kLegacyPwncrackKey; }
 const char* legacyWigleKeyPath() { return kLegacyWigleKey; }
 
 void sanitizeSsid(const char* ssid, char* out, size_t outLen) {
@@ -568,6 +584,7 @@ void ensureDirs() {
     ensureDir(kNewScreenshots);
     ensureDir(kNewDiagnostics);
     ensureDir(kNewWpaSec);
+    ensureDir(kNewPwncrack);
     ensureDir(kNewWigle);
     ensureDir(kNewXp);
     ensureDir(kNewMisc);
@@ -719,6 +736,7 @@ bool migrateIfNeeded() {
     ensureDir(kNewRoot);
     ensureDir(kNewConfig);
     ensureDir(kNewWpaSec);
+    ensureDir(kNewPwncrack);
     ensureDir(kNewWigle);
     ensureDir(kNewXp);
     ensureDir(kNewMisc);

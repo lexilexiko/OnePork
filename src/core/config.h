@@ -99,6 +99,7 @@ struct WiFiConfig {
     char otaPassword[65];
     bool autoConnect = false;
     char wpaSecKey[33];                 // WPA-SEC.stanev.org user key (32 hex chars)
+    char pwncrackKey[65] = "";          // pwncrack.org key (from email signup)
     char wigleApiName[65];              // WiGLE API Name (from wigle.net/account)
     char wigleApiToken[65];             // WiGLE API Token (from wigle.net/account)
 };
@@ -202,6 +203,8 @@ public:
     static bool isSDAvailable();
     static bool reinitSD();  // Try to (re)initialize SD card at runtime
     static bool loadWpaSecKeyFromFile();  // Load key from /m5porkchop/wpa-sec/wpasec_key.txt (legacy /wpasec_key.txt)
+    static bool loadPwncrackKeyFromFile(); // /m5porkchop/pwncrack/key.txt (legacy /pwncrack_key.txt)
+    static bool reloadPwncrackKeyFromNvs(); // restore key from NVS into RAM
     static bool loadWigleKeyFromFile();   // Load keys from /m5porkchop/wigle/wigle_key.txt (legacy /wigle_key.txt)
     static void prepareSDBus();           // Prepare SPI bus for raw SD access
     static void prepareCapLoraGpio();     // Quiesce SX1262 and clear G13 IOMUX before GPS UART

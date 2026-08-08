@@ -13,6 +13,7 @@
 #include "../ui/flexes_screen.h"
 #include "../ui/boar_bros_menu.h"
 #include "../ui/tracks_menu.h"
+#include "../ui/pwncrack_menu.h"
 #include "../ui/unlockables_menu.h"
 #include "../ui/sd_format_menu.h"
 #include "../ui/files_menu.h"
@@ -61,6 +62,7 @@ static const char* modeToString(PorkchopMode mode) {
         case PorkchopMode::MENU: return "MENU";
         case PorkchopMode::SETTINGS: return "SETTINGS";
         case PorkchopMode::HASHES: return "HASHES";
+        case PorkchopMode::PWNCRACK_MODE: return "PWNCRACK";
         case PorkchopMode::BADGES: return "BADGES";
         case PorkchopMode::XFER: return "XFER";
         case PorkchopMode::COREDUMP: return "COREDUMP";
@@ -252,6 +254,7 @@ void Porkchop::init() {
             case 27: setMode(PorkchopMode::FRUIT_RUN_MODE); break;
             case 28: setMode(PorkchopMode::IR_PORK_MODE); break;
             case 29: Display::showChallenges(); break;  // RANK → D3M4NDS (session trials)
+            case 30: setMode(PorkchopMode::PWNCRACK_MODE); break;
         }
     });
 
@@ -428,6 +431,9 @@ void Porkchop::setMode(PorkchopMode mode) {
         case PorkchopMode::HASHES:
             HashesMenu::hide();
             break;
+        case PorkchopMode::PWNCRACK_MODE:
+            PwncrackMenu::hide();
+            break;
         case PorkchopMode::BADGES:
             BadgesMenu::hide();
             break;
@@ -571,6 +577,9 @@ void Porkchop::setMode(PorkchopMode mode) {
             break;
         case PorkchopMode::HASHES:
             HashesMenu::show();
+            break;
+        case PorkchopMode::PWNCRACK_MODE:
+            PwncrackMenu::show();
             break;
         case PorkchopMode::BADGES:
             BadgesMenu::show();
@@ -1330,6 +1339,12 @@ void Porkchop::updateMode() {
         case PorkchopMode::HASHES:
             HashesMenu::update();
             if (!HashesMenu::isActive()) {
+                setMode(PorkchopMode::MENU);
+            }
+            break;
+        case PorkchopMode::PWNCRACK_MODE:
+            PwncrackMenu::update();
+            if (!PwncrackMenu::isActive()) {
                 setMode(PorkchopMode::MENU);
             }
             break;

@@ -97,6 +97,11 @@ static const char* const H_HASHES[] = {
     "COLLECTED PAIN. COMPRESSED.",
     "MALLOC SAID NAH."
 };
+static const char* const H_PWNCRACK[] = {
+    "PWNCRACK.ORG — NOT WPA-SEC.",
+    "UPLOAD .22000. DOWNLOAD POTFILE.",
+    "KEY IN /M5PORKCHOP/PWNCRACK/KEY.TXT"
+};
 static const char* const H_TRACKS[] = {
     "PORK TRAILS TO WIGLE.",
     "MAP IT OUT. PRETEND IT'S SCIENCE.",
@@ -220,6 +225,7 @@ const uint8_t Menu::GROUP_RECON_SIZE = sizeof(GROUP_RECON) / sizeof(GROUP_RECON[
 // Group: LOOT - captured data and targets
 const MenuItem Menu::GROUP_LOOT[] = {
     {"C#", "HASHES",  4,  H_HASHES, (uint8_t)(sizeof(H_HASHES)/sizeof(H_HASHES[0]))},
+    {"PC", "PWNCRACK", 30, H_PWNCRACK, (uint8_t)(sizeof(H_PWNCRACK)/sizeof(H_PWNCRACK[0]))},
     {"~>", "TRACKS",  13, H_TRACKS, (uint8_t)(sizeof(H_TRACKS)/sizeof(H_TRACKS[0]))},
     {"B$", "BOUNTY",  17, H_BOUNTY, (uint8_t)(sizeof(H_BOUNTY)/sizeof(H_BOUNTY[0]))},
     {"PP", "PIGPASS", 23, H_PIGPASS, (uint8_t)(sizeof(H_PIGPASS)/sizeof(H_PIGPASS[0]))}
