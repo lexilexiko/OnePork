@@ -6,8 +6,6 @@
 #include "../core/sd_layout.h"
 #include "../core/wifi_utils.h"
 #include "../core/heap_gates.h"
-#include "../core/network_recon.h"
-#include "../ui/tracks_menu.h"
 #include "../piglet/avatar.h"
 #include "../piglet/mood.h"
 #include <WiFiClientSecure.h>
@@ -844,30 +842,13 @@ PwncrackSyncResult Pwncrack::syncCaptures(PwncrackProgressCallback cb) {
         ~SceneGuard() { Avatar::resumeScene(); }
     } sceneGuard;
 
-    // Park NetworkRecon — promiscuous callback может фрагментировать heap во время HTTP
-    bool wasReconRunning = NetworkRecon::isRunning();
-    if (wasReconRunning) {
-        Serial.println("[PWNCRACK] Pausing NetworkRecon for sync");
-        NetworkRecon::pause();
-        NetworkRecon::freeNetworks();   // ~19KB reclaim
-    }
-
-    // Park TracksMenu (Wigle) если открыт — ест heap на списке/UI state.
-    // Не восстанавливаем после sync: пользователь сам переоткроет.
-    if (TracksMenu::isActive()) {
-        Serial.println("[PWNCRACK] Hiding TracksMenu for sync");
-        TracksMenu::hide();
-    }
-
     if (!hasApiKey()) {
         strncpy(result.error, "NO PWNCRACK KEY", sizeof(result.error) - 1);
-        if (wasReconRunning) NetworkRecon::resume();
         busy = false;
         return result;
     }
     if (WiFi.status() != WL_CONNECTED) {
         strncpy(result.error, "WIFI NOT CONNECTED", sizeof(result.error) - 1);
-        if (wasReconRunning) NetworkRecon::resume();
         busy = false;
         return result;
     }
@@ -880,7 +861,6 @@ PwncrackSyncResult Pwncrack::syncCaptures(PwncrackProgressCallback cb) {
         if (!canSync()) {
             Mood::setStatusMessage("HEAP TIGHT");
             snprintf(result.error, sizeof(result.error), "%s", lastError[0] ? lastError : "LOW HEAP");
-            if (wasReconRunning) NetworkRecon::resume();
             busy = false;
             return result;
         }
@@ -891,7 +871,6 @@ PwncrackSyncResult Pwncrack::syncCaptures(PwncrackProgressCallback cb) {
     const char* hsDir = SDLayout::handshakesDir();
     if (!SD.exists(hsDir)) {
         strncpy(result.error, "NO HANDSHAKES DIR", sizeof(result.error) - 1);
-        if (wasReconRunning) NetworkRecon::resume();
         busy = false;
         return result;
     }
@@ -994,13 +973,6 @@ PwncrackSyncResult Pwncrack::syncCaptures(PwncrackProgressCallback cb) {
     if (result.success && result.error[0] == '\0') {
         // leave error empty on success
     }
-
-    // Restore NetworkRecon если был запущен
-    if (wasReconRunning) {
-        Serial.println("[PWNCRACK] Resuming NetworkRecon after sync");
-        NetworkRecon::resume();
-    }
-
     busy = false;
     return result;
 }
