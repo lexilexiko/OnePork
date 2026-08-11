@@ -288,10 +288,10 @@ void Porkchop::init() {
     // SFX::init() already called in setup() for boot sound — don't re-init
     // Boot toast: highlight big new features (not last bugfix)
     Display::showToast(
-        "NEW: 1RP0RK  FRU1TRUN  S3AS0N\n"
-        "RANK  FL3X3S+GR1ND  W0LF\n"
-        "I=IR  G=FRUIT  S=STATS",
-        2600
+        "NEW: PWNCRACK  PIGPASS\n"
+        "NEW: PIGPASSI=IR\n"
+        "NEW: EVILPIG",
+        1500
     );
     
     Serial.println("[PORKCHOP] Initialized");

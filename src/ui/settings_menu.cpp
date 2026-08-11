@@ -126,11 +126,11 @@ static const EntryData kSceneEntries[] = {
     {SET_SEASON, "SEASON", SettingType::VALUE, 0, (int)SEASON_MODE_COUNT - 1, 1, "", "AUTO / SPRING..RETRO"},
     {SET_PIG_SKIN, "PIG SKIN", SettingType::VALUE, 0, (int)PIG_SKIN_COUNT - 1, 1, "", "ZOMBIE=3 NIGHT WOLF BITES"},
     {SET_SCROLL_SPD, "SCROLL SPD", SettingType::VALUE, 1, 10, 1, "", "WORLD SCROLL AT EDGES 1-10"},
-    {SET_WOLF, "WOLF", SettingType::TOGGLE, 0, 1, 1, "", "RANDOM WOLF VISITOR ON/OFF"},
-    {SET_FRUIT_TREES, "FRUIT TREES", SettingType::TOGGLE, 0, 1, 1, "", "RANDOM FRUIT TREES + DROPS"},
-    {SET_ANIM_TEST, "ANIM TEST", SettingType::TOGGLE, 0, 1, 1, "", "IDLE: -/= CYCLE EMOTIONS"},
-    // --- TEST LAB (runtime, reboot restores all ON) ---
+ // --- TEST LAB (runtime, reboot restores all ON) ---
     {SET_SCENE_ALL, "ALL LAYERS", SettingType::TOGGLE, 0, 1, 1, "", "MASTER: ON=full scene OFF=blank"},
+    {SET_FRUIT_TREES, "FRUIT TREES", SettingType::TOGGLE, 0, 1, 1, "", "RANDOM FRUIT TREES + DROPS"},
+    {SET_WOLF, "WOLF", SettingType::TOGGLE, 0, 1, 1, "", "RANDOM WOLF VISITOR ON/OFF"},
+    {SET_ANIM_TEST, "ANIM TEST", SettingType::TOGGLE, 0, 1, 1, "", "IDLE: -/= CYCLE EMOTIONS"},
     {SET_SHOW_PIG, "SHOW PIG", SettingType::TOGGLE, 0, 1, 1, "", "DRAW PIG BODY"},
     {SET_SHOW_GRASS, "SHOW GRASS", SettingType::TOGGLE, 0, 1, 1, "", "DRAW GRASS / DIRT"},
     {SET_SHOW_TREES, "SHOW TREES", SettingType::TOGGLE, 0, 1, 1, "", "DRAW TREES/BUSHES/DROPS"},

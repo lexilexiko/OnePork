@@ -136,7 +136,7 @@ struct PersonalityConfig {
     // RETRO = monochrome old-film scene + falling pixels (manual only, not in AUTO)
     uint8_t seasonMode = 0;  // AUTO default
     // Avatar animation lab: - / = cycle emotions+FX when IDLE
-    bool animTest = false;
+    bool animTest = true;
     // Random wolf visitor in avatar scene (settings toggle)
     bool wolfEnabled = true;
     // World scroll speed at camera rails 1..10 (default 6; 10 = very fast)
