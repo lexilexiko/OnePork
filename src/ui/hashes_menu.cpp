@@ -7,13 +7,16 @@
 #include <time.h>
 #include <ctype.h>
 #include <string.h>
+#include <new>  // std::bad_alloc for try/catch around push_back
 #include "display.h"
 #include "../core/tls.h"
+#include "../core/heap_gates.h"  // HeapGates::checkTlsGates() in startSync()
 #include "../web/wpasec.h"
 #include "../core/config.h"
 #include "../core/sd_layout.h"
 #include "../core/wifi_utils.h"
 #include "../core/heap_health.h"
+#include "../piglet/avatar.h"   // Avatar::suspendScene/resumeScene in startSync()/hide()
 #include "../core/network_recon.h"
 #include <esp_heap_caps.h>
 
@@ -64,6 +67,10 @@ uint8_t HashesMenu::syncUploaded = 0;
 uint8_t HashesMenu::syncFailed = 0;
 uint16_t HashesMenu::syncCracked = 0;
 char HashesMenu::syncError[48] = "";
+
+// Diag modal state
+bool HashesMenu::diagModalActive = false;
+WPASec::WPASecDiagResult HashesMenu::lastDiag = {};
 
 namespace {
 
@@ -152,18 +159,28 @@ void HashesMenu::show() {
 
 void HashesMenu::hide() {
     active = false;
-    
+
+    // Restore subsystems that may have been parked by startSync() and not yet resumed
+    Avatar::resumeScene();
+    if (NetworkRecon::isPaused()) {
+        Serial.println("[HASHES] Resuming NetworkRecon on hide");
+        NetworkRecon::resume();
+    }
+
     // FIX: Always call emergencyCleanup first - ensures file handles closed
     emergencyCleanup();
-    
+
     // Enhanced: Force cleanup even if interrupted
     captures.clear();
-    captures.shrink_to_fit();  // Release vector capacity
+    // NOTE: do NOT call shrink_to_fit() here — on fragmented heap it can realloc
+    // and throw bad_alloc → std::terminate → abort(). Clear keeps capacity but
+    // releases elements; the next scan will reuse the buffer.
     WPASec::freeCacheMemory();
-    
+
     // Reset all async state to prevent leaks (redundant after emergencyCleanup but safe)
     scanInProgress = false;
     wpasecUpdateInProgress = false;
+    diagModalActive = false;
     if (scanDir) {
         scanDir.close();
     }
@@ -177,12 +194,18 @@ void HashesMenu::hide() {
 void HashesMenu::emergencyCleanup() {
     // Can be called from main loop when heap is critical
     if (!active) return;
-    
+
     Serial.println("[HASHES] Emergency cleanup triggered");
     captures.clear();
-    captures.shrink_to_fit();
+    // No shrink_to_fit — same fragmentation risk as hide()
     WPASec::freeCacheMemory();
-    
+
+    // Restore scene so the pig stays visible after emergency cleanup
+    Avatar::resumeScene();
+    if (NetworkRecon::isPaused()) {
+        NetworkRecon::resume();
+    }
+
     // Stop any in-progress operations
     scanInProgress = false;
     wpasecUpdateInProgress = false;
@@ -199,7 +222,6 @@ void HashesMenu::emergencyCleanup() {
 bool HashesMenu::scanCaptures() {
     // Initialize async scan
     captures.clear();
-    captures.reserve(8);  // Grow naturally — reserve(100) was ~17KB contiguous, crash-prone on fragmented heap
     scanDeferredHeap = false;
 
     // Guard: Skip if no SD card available
@@ -237,9 +259,28 @@ bool HashesMenu::scanCaptures() {
         return false;
     }
 
-    Serial.printf("[HASHES] Scan OK: free=%u largest=%u\n",
-                  (unsigned)ESP.getFreeHeap(),
-                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+    // Adaptive reserve: CaptureInfo is ~140B (filename+ssid+bssid+isPMKID+size+time+status+password).
+    // We want up to MAX_CAPTURES (100) but must avoid realloc-fragmentation crashes.
+    // Try 100 first, shrink by 25% if heap is tight — never reserve more than we can fit.
+    constexpr uint16_t kMaxCapturesCap = 100;
+    uint16_t reserveTarget = kMaxCapturesCap;
+    const size_t kPerCap = 160;  // sizeof(CaptureInfo) + allocator overhead
+
+    size_t freeHeap = ESP.getFreeHeap();
+    size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    while (reserveTarget > 8 &&
+           (largest < (size_t)reserveTarget * kPerCap / 2 ||
+            freeHeap < (size_t)reserveTarget * kPerCap * 2)) {
+        reserveTarget = (uint16_t)(reserveTarget * 3 / 4);
+    }
+
+    Serial.printf("[HASHES] Scan OK: free=%u largest=%u reserveTarget=%u\n",
+                  (unsigned)freeHeap, (unsigned)largest, (unsigned)reserveTarget);
+    // NOTE: do NOT call reserve() here — std::vector::reserve can throw std::bad_alloc
+    // on fragmented heap → std::terminate → abort(). The original code had
+    // `captures.reserve(8)` which caused the original 0x421308ca crash.
+    // Instead, we let push_back grow naturally and gate each push below.
+    (void)reserveTarget;  // kept for telemetry; logic lives in processAsyncScan
 
     const char* preferredDir = SDLayout::handshakesDir();
     const char* handshakesDir = resolveCaptureScanDir();
@@ -426,14 +467,52 @@ void HashesMenu::processAsyncScan() {
 
             info.status = CaptureStatus::LOCAL;
 
-            captures.push_back(info);
-
+            // Three-layer guard to prevent std::bad_alloc → abort:
+            //   1. Hard cap at MAX_CAPTURES (defensive bound)
+            //   2. Heap gate before each push (avoid realloc into fragmented region)
+            //   3. try/catch as last-resort safety net for std::vector::push_back
+            //
+            // The 192-byte CaptureInfo * N can quickly exhaust heap on a fragmented state.
+            // If we'd grow past current capacity, std::vector reallocates — and that realloc
+            // is exactly where the original 0x421308ca abort came from.
             if (captures.size() >= MAX_CAPTURES) {
+                // Already at hard cap — stop scanning cleanly
                 scanComplete = true;
                 scanInProgress = false;
                 currentFile.close();
                 scanDir.close();
                 Serial.println("[HASHES] Hit capture limit, stopped scan");
+                break;
+            }
+
+            // Pre-push heap gate: ensure room for one more CaptureInfo + 25% allocator overhead.
+            // If heap can't fit even one more entry, stop scanning rather than crash.
+            if (captures.size() + 1 > captures.capacity()) {
+                size_t needBytes = sizeof(CaptureInfo) + sizeof(CaptureInfo) / 4;  // ~240B
+                size_t freeH = ESP.getFreeHeap();
+                size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+                if (largest < needBytes || freeH < needBytes * 3) {
+                    Serial.printf("[HASHES] Pre-push gate: free=%u largest=%u need=%u — stopping scan at %u\n",
+                                  (unsigned)freeH, (unsigned)largest, (unsigned)needBytes,
+                                  (unsigned)captures.size());
+                    scanComplete = true;
+                    scanInProgress = false;
+                    currentFile.close();
+                    scanDir.close();
+                    break;
+                }
+            }
+
+            try {
+                captures.push_back(info);
+            } catch (const std::bad_alloc&) {
+                // std::vector::push_back hit OOM — stop scanning, don't crash the device.
+                Serial.printf("[HASHES] bad_alloc on push_back at size=%u — stopping scan\n",
+                              (unsigned)captures.size());
+                scanComplete = true;
+                scanInProgress = false;
+                currentFile.close();
+                scanDir.close();
                 break;
             }
         }
@@ -480,25 +559,26 @@ void HashesMenu::processAsyncWPASecUpdate() {
         wpasecUpdateInProgress = false;
         return;
     }
-    
-    // Throttle the update to avoid blocking the UI
-    if (millis() - lastWpasecUpdateTime < WPASEC_UPDATE_DELAY) {
-        return;
-    }
-    
+
     lastWpasecUpdateTime = millis();
-    
-    // Process a chunk of captures
+
+    // Load WPA-SEC cache once per scan (was: every chunk)
+    if (wpasecUpdateProgress == 0) {
+        WPASec::loadCache();
+    }
+
+    // With only ~16 files in test setup, process all of them in one frame.
+    // For larger lists (>40), chunk to keep UI responsive. The loop yields
+    // at the top of update() naturally so this is safe.
+    constexpr size_t kChunkSize = 50;
     size_t processed = 0;
-    while (processed < WPASEC_UPDATE_CHUNK_SIZE && wpasecUpdateProgress < captures.size()) {
+    while (processed < kChunkSize && wpasecUpdateProgress < captures.size()) {
         auto& cap = captures[wpasecUpdateProgress];
-        
-        // Normalize BSSID for lookup (remove colons)
+
         char normalized[13] = {0};
         WPASec::normalizeBSSID_Char(cap.bssid, normalized, sizeof(normalized));
-        
+
         if (normalized[0] != '\0') {
-            // Use getPassword() directly — avoids redundant binary search vs isCracked()+getPassword()
             const char* pw = WPASec::getPassword(normalized);
             if (pw[0] != '\0') {
                 cap.status = CaptureStatus::CRACKED;
@@ -515,14 +595,8 @@ void HashesMenu::processAsyncWPASecUpdate() {
 
         wpasecUpdateProgress++;
         processed++;
-        
-        // Yield periodically to allow other tasks to run
-        if (processed >= WPASEC_UPDATE_CHUNK_SIZE) {
-            // Still more to do, but yield control back to other tasks
-            break;
-        }
     }
-    
+
     // Check if we're done with all captures
     if (wpasecUpdateProgress >= captures.size()) {
         wpasecUpdateInProgress = false;
@@ -660,7 +734,19 @@ void HashesMenu::handleInput() {
     if (M5Cardputer.Keyboard.isKeyPressed('s') || M5Cardputer.Keyboard.isKeyPressed('S')) {
         startSync();
     }
-    
+
+    // T key — diagnostic / self-test (no upload, no HTTP)
+    if (M5Cardputer.Keyboard.isKeyPressed('t') || M5Cardputer.Keyboard.isKeyPressed('T')) {
+        lastDiag = WPASec::runDiagnostics();
+        diagModalActive = true;
+    }
+
+    // Enter closes diag modal
+    if (diagModalActive && keys.enter) {
+        diagModalActive = false;
+        return;
+    }
+
     // Nuke all loot with D key
     if (M5Cardputer.Keyboard.isKeyPressed('d') || M5Cardputer.Keyboard.isKeyPressed('D')) {
         if (!captures.empty()) {
@@ -726,6 +812,12 @@ void HashesMenu::draw(M5Canvas& canvas) {
     // Draw sync modal FIRST - takes precedence over empty captures message
     if (syncModalActive) {
         drawSyncModal(canvas);
+        return;
+    }
+
+    // Diag modal - takes precedence over list
+    if (diagModalActive) {
+        drawDiagModal(canvas);
         return;
     }
 
@@ -857,8 +949,38 @@ void HashesMenu::draw(M5Canvas& canvas) {
     }
 }
 
+void HashesMenu::drawDiagModal(M5Canvas& canvas) {
+    // Box sized for up to 8 lines of 28 chars
+    const int boxW = 240;
+    const int lineH = 12;
+    const int boxH = lineH * (lastDiag.lineCount + 3) + 8;
+    const int boxX = (canvas.width() - boxW) / 2;
+    const int boxY = (canvas.height() - boxH) / 2 - 4;
+
+    // Border + fill
+    canvas.fillRoundRect(boxX - 2, boxY - 2, boxW + 4, boxH + 4, 8, COLOR_BG);
+    canvas.fillRoundRect(boxX, boxY, boxW, boxH, 8, COLOR_FG);
+    canvas.setTextColor(COLOR_BG, COLOR_FG);
+    canvas.setTextDatum(TL_DATUM);
+    canvas.setTextSize(1);
+
+    int y = boxY + 6;
+    canvas.drawString("WPA-SEC TEST", boxX + 8, y);
+    y += lineH + 2;
+
+    for (uint8_t i = 0; i < lastDiag.lineCount; i++) {
+        canvas.drawString(lastDiag.lines[i], boxX + 8, y);
+        y += lineH;
+    }
+
+    // Status line at bottom: red/green per canSyncOk
+    canvas.setTextColor(lastDiag.canSyncOk ? UiStyle::CYAN : UiStyle::RED, COLOR_FG);
+    canvas.drawString(lastDiag.canSyncOk ? "OK ENTER" : "FAIL CHECK DETAIL",
+                      boxX + 8, boxY + boxH - lineH);
+    canvas.setTextDatum(TL_DATUM);
+}
+
 void HashesMenu::drawNukeConfirm(M5Canvas& canvas) {
-    // Modal box dimensions - matches PIGGYBLUES warning style
     const int boxW = 200;
     const int boxH = 70;
     const int boxX = (canvas.width() - boxW) / 2;
@@ -1201,7 +1323,19 @@ void HashesMenu::disconnectWiFi() {
 
 void HashesMenu::startSync() {
     Serial.println("[HASHES] Starting WPA-SEC sync...");
-    
+
+    // Log heap state for diagnostics (do NOT gate here — let syncCaptures + conditionHeapForTLS run)
+    HeapGates::TlsGateStatus pre = HeapGates::checkTlsGates();
+    Serial.printf("[HASHES] Pre-sync heap: free=%u largest=%u\n",
+                  (unsigned)pre.freeHeap, (unsigned)pre.largestBlock);
+
+    if (!WPASec::hasApiKey()) {
+        strncpy(syncError, "NO WPA-SEC KEY", sizeof(syncError) - 1);
+        syncModalActive = true;
+        syncState = SyncState::ERROR;
+        return;
+    }
+
     // Reset sync state
     syncModalActive = true;
     syncState = SyncState::CONNECTING_WIFI;
@@ -1213,30 +1347,51 @@ void HashesMenu::startSync() {
     syncFailed = 0;
     syncCracked = 0;
     syncStartTime = millis();
-    
-    // Pre-flight checks
-    if (!WPASec::hasApiKey()) {
-        strncpy(syncError, "NO WPA-SEC KEY", sizeof(syncError) - 1);
-        syncState = SyncState::ERROR;
-        return;
+
+    // === AGGRESSIVE PRE-SYNC CLEANUP ===
+    // Same pattern we used in Pwncrack + WPA-SEC sync path:
+    // park heavy subsystems to give TLS the largest contiguous block possible.
+    // Without this, fragmented heap from Mood/Avatar/Recon causes sync to fail
+    // even when total free heap looks OK.
+    Serial.println("[HASHES] Aggressive pre-sync cleanup starting...");
+
+    // 1. Park pig scene (frees Mood buffers, scene layers, weather trees etc.)
+    Avatar::suspendScene();
+
+    // 2. Stop NetworkRecon — promiscuous mode + ~19KB network buffer
+    bool wasReconRunning = NetworkRecon::isRunning();
+    if (wasReconRunning) {
+        Serial.println("[HASHES] Pausing NetworkRecon for sync");
+        NetworkRecon::pause();
+        NetworkRecon::freeNetworks();
     }
-    
-    // Free memory before heavy operations
+
+    // 3. Free our own data + WPA-SEC cache
     captures.clear();
-    captures.shrink_to_fit();
     WPASec::freeCacheMemory();
-    
-    Serial.printf("[HASHES] Heap after freeing: %u\n", (unsigned int)ESP.getFreeHeap());
+
+    // 4. Heap conditioning — coalesce fragmented blocks (synchronous, may take ~1-2s)
+    Serial.println("[HASHES] Running WiFiUtils::conditionHeapForTLS...");
+    size_t largestAfter = WiFiUtils::conditionHeapForTLS();
+    Serial.printf("[HASHES] Post-conditioning heap: free=%u largest=%u\n",
+                  (unsigned)ESP.getFreeHeap(), (unsigned)largestAfter);
 }
 
 void HashesMenu::cancelSync() {
     Serial.println("[HASHES] Sync cancelled");
-    
+
     // Clean up
     disconnectWiFi();
     syncModalActive = false;
     syncState = SyncState::IDLE;
-    
+
+    // Restore subsystems parked in startSync() — safe to call even if not parked
+    // (Avatar::resumeScene tracks its own suspend count).
+    Avatar::resumeScene();
+    if (NetworkRecon::isPaused()) {
+        NetworkRecon::resume();
+    }
+
     // Rescan captures
     scanCaptures();
 }
@@ -1276,11 +1431,18 @@ void HashesMenu::processSyncState() {
                 syncUploaded = result.uploaded;
                 syncFailed = result.failed;
                 syncCracked = result.cracked;
-                
+
                 if (result.error[0] != '\0') {
                     strncpy(syncError, result.error, sizeof(syncError) - 1);
                 }
-                
+
+                // === RESTORE subsystems that were parked in startSync() ===
+                // Without this, Avatar scene stays suspended and NetworkRecon never resumes,
+                // leaving the device in a degraded state after sync.
+                Avatar::resumeScene();
+                Serial.println("[HASHES] Restored Avatar scene");
+
+                // Rescan after sync so updated WPA-SEC cache (potfile) is reflected
                 syncState = SyncState::COMPLETE;
             }
             break;

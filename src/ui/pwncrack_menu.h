@@ -25,6 +25,17 @@ struct PwnFileInfo {
     char password[64];
 };
 
+// Lightweight metadata for the scan list (no status / password).
+// ~96 bytes vs PwnFileInfo's ~280 bytes — lets us hold 200+ files cheaply.
+struct PwnFileMeta {
+    char filename[48];
+    char ssid[33];
+    char bssid[18];
+    char bssidHex[13];
+    uint32_t fileSize;
+    bool isPMKID;
+};
+
 enum class PwnSyncState : uint8_t {
     IDLE,
     CONNECTING_WIFI,
@@ -43,7 +54,7 @@ public:
     static void update();
     static void draw(M5Canvas& canvas);
     static bool isActive() { return active; }
-    static size_t getFileCount() { return files.size(); }
+    static size_t getFileCount() { return metas.size(); }
     // Bottom bar hints (same pattern as HASHES/WPA-SEC)
     static const char* getBottomHint();
 
@@ -62,7 +73,9 @@ private:
     static uint16_t syncNewCracked;
     static uint8_t scrollOffset;
     static uint8_t selectedIndex;
-    static std::vector<PwnFileInfo> files;
+    static std::vector<PwnFileMeta> metas;
+    static PwnFileInfo selectedInfo;     // Built lazily for the currently selected file
+    static bool selectedInfoValid;
     static PwncrackDiagResult lastDiag;
     static uint8_t hintIndex;
     static const char* const HINTS[];
@@ -71,7 +84,7 @@ private:
 
     static void handleInput();
     static void scanFiles();
-    static void refreshStatuses();
+    static void refreshSelected();
     static void startSync();
     static void startDiag();
     static void processSyncState();

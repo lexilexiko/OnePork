@@ -10,6 +10,7 @@
 #include "../core/network_recon.h"
 #include "../piglet/mood.h"
 #include "../piglet/avatar.h"
+#include <cstdarg>
 #include <SD.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
@@ -245,6 +246,73 @@ bool WPASec::isUploaded(const char* bssid) {
 
 const char* WPASec::getLastError() {
     return lastError;
+}
+
+WPASec::WPASecDiagResult WPASec::runDiagnostics() {
+    WPASecDiagResult r = {};
+    r.lineCount = 0;
+
+    // 1. Check API key
+    r.keyOk = hasApiKey();
+    const char* key = Config::wifi().wpaSecKey;
+    size_t keyLen = key ? strlen(key) : 0;
+
+    // 2. Check WiFi SSID configured
+    const char* ssid = Config::wifi().otaSSID;
+    r.ssidConfigured = (ssid && ssid[0] != '\0');
+    if (ssid) {
+        strncpy(r.ssid, ssid, sizeof(r.ssid) - 1);
+    }
+
+    // 3. Check WiFi connection
+    r.wifiOk = (WiFi.status() == WL_CONNECTED);
+    if (r.wifiOk) {
+        IPAddress ip = WiFi.localIP();
+        snprintf(r.ip, sizeof(r.ip), "%u.%u.%u.%u",
+                 ip[0], ip[1], ip[2], ip[3]);
+        snprintf(r.rssi, sizeof(r.rssi), "%ddBm", (int)WiFi.RSSI());
+    }
+
+    // 4. Load cache (this can fail if SD issue)
+    r.cacheLoaded = loadCache();
+    r.crackedCount = crackedCache.size();
+    r.uploadedCount = uploadedCache.size();
+
+    // 5. Heap snapshot + canSync gate
+    r.freeHeap = ESP.getFreeHeap();
+    r.largestBlock = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    HeapGates::TlsGateStatus tls = HeapGates::checkTlsGates();
+    r.canSyncOk = HeapGates::canTls(tls, r.detail, sizeof(r.detail));
+
+    // Build UI lines (28 chars each, max 8)
+    auto addLine = [&](const char* fmt, ...) {
+        if (r.lineCount >= 8) return;
+        va_list ap; va_start(ap, fmt);
+        vsnprintf(r.lines[r.lineCount], sizeof(r.lines[0]), fmt, ap);
+        va_end(ap);
+        r.lineCount++;
+    };
+
+    addLine("KEY: %s (%u chars)", r.keyOk ? "OK" : "BAD", (unsigned)keyLen);
+    addLine("SSID: %s", r.ssidConfigured ? r.ssid : "(none)");
+    addLine("WIFI: %s%s", r.wifiOk ? "OK " : "DOWN", r.wifiOk ? " " : "");
+    if (r.wifiOk) {
+        addLine("IP %s  %s", r.ip, r.rssi);
+    }
+    addLine("CACHE: %s (%u ok / %u up)",
+            r.cacheLoaded ? "OK" : "BAD",
+            (unsigned)r.crackedCount, (unsigned)r.uploadedCount);
+    addLine("HEAP: %uK free, %uK cont",
+            (unsigned)(r.freeHeap / 1024), (unsigned)(r.largestBlock / 1024));
+    addLine("TLS GATE: %s", r.canSyncOk ? "PASS" : "FAIL");
+    if (!r.canSyncOk && r.detail[0]) {
+        addLine("-> %s", r.detail);
+    }
+    if (lastError[0] && !r.canSyncOk) {
+        addLine("LAST ERR: %.24s", lastError);
+    }
+
+    return r;
 }
 
 void WPASec::freeCacheMemory() {
@@ -682,7 +750,7 @@ WPASecSyncResult WPASec::syncCaptures(WPASecProgressCallback cb) {
         char path[80];
         char bssid[13];
     };
-    static PendingUpload pendingUploads[16];  // Max 16 per sync (reduced from 50, saves ~3KB BSS)
+    static PendingUpload pendingUploads[16];  // Max 16 per sync (saves ~3KB BSS vs 50)
     uint8_t pendingCount = 0;
 
     File dir = SD.open(hsDir);

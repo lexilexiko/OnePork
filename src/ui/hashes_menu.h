@@ -6,6 +6,7 @@
 #include <vector>
 #include <FS.h>
 #include <SD.h>
+#include "../web/wpasec.h"  // for WPASec::WPASecDiagResult in diag modal
 
 // WPA-SEC status for display
 enum class CaptureStatus {
@@ -106,6 +107,11 @@ private:
     static uint8_t syncFailed;
     static uint16_t syncCracked;
     static char syncError[48];
+
+    // Diag modal (T-key network self-test)
+    static bool diagModalActive;
+    static WPASec::WPASecDiagResult lastDiag;
+    static void drawDiagModal(M5Canvas& canvas);
     
     // Sync operations
     static void startSync();

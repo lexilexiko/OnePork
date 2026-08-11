@@ -28,7 +28,9 @@ uint16_t PwncrackMenu::syncCracked = 0;
 uint16_t PwncrackMenu::syncNewCracked = 0;
 uint8_t PwncrackMenu::scrollOffset = 0;
 uint8_t PwncrackMenu::selectedIndex = 0;
-std::vector<PwnFileInfo> PwncrackMenu::files;
+std::vector<PwnFileMeta> PwncrackMenu::metas;
+PwnFileInfo PwncrackMenu::selectedInfo = {};
+bool PwncrackMenu::selectedInfoValid = false;
 PwncrackDiagResult PwncrackMenu::lastDiag = {};
 uint8_t PwncrackMenu::hintIndex = 0;
 
@@ -80,7 +82,8 @@ void PwncrackMenu::init() {
     syncModalActive = false;
     detailViewActive = false;
     syncState = PwnSyncState::IDLE;
-    files.clear();
+    metas.clear();
+    selectedInfoValid = false;
 }
 
 void PwncrackMenu::ensureKeyLoaded() {
@@ -154,44 +157,83 @@ void PwncrackMenu::parseNameMeta(PwnFileInfo& info) {
     }
 }
 
-void PwncrackMenu::refreshStatuses() {
-    Pwncrack::loadCache();
-    for (auto& f : files) {
-        f.password[0] = '\0';
-        f.status = PwnCaptureStatus::LOCAL;
+// Forward declaration — see definition below
+static PwnFileInfo materialize(const PwnFileMeta& m, const char* hsDir);
 
-        // Password lookup: BSSID hex, SSID, then filename
-        const char* pw = "";
-        if (f.bssidHex[0]) {
-            pw = Pwncrack::getPassword(f.bssidHex);
-        }
-        if (!pw || pw[0] == '\0') {
-            pw = Pwncrack::getPassword(f.ssid);
-        }
-        if ((!pw || pw[0] == '\0') && f.filename[0]) {
-            pw = Pwncrack::getPassword(f.filename);
-        }
-
-        if (pw && pw[0] != '\0') {
-            f.status = PwnCaptureStatus::CRACKED;
-            strncpy(f.password, pw, sizeof(f.password) - 1);
-            f.password[sizeof(f.password) - 1] = '\0';
-            continue;
-        }
-
-        // Uploaded? by filename or bssid hex
-        if (Pwncrack::isUploaded(f.filename) ||
-            (f.bssidHex[0] && Pwncrack::isUploaded(f.bssidHex))) {
-            f.status = PwnCaptureStatus::UPLOADED;
-        } else {
-            f.status = PwnCaptureStatus::LOCAL;
-        }
+// Load status + password for the currently selected file (lazy).
+// Called on scroll, on Enter (detail), and after upload sync.
+void PwncrackMenu::refreshSelected() {
+    if (metas.empty() || selectedIndex >= metas.size()) {
+        selectedInfoValid = false;
+        return;
     }
+    selectedInfo = materialize(metas[selectedIndex], SDLayout::handshakesDir());
+    selectedInfoValid = true;
+}
+
+// Convert a lightweight meta into a full PwnFileInfo (loads status + password).
+// Used lazily for the currently selected file, and for the on-screen window.
+static PwnFileInfo materialize(const PwnFileMeta& m, const char* hsDir) {
+    PwnFileInfo info{};
+    strncpy(info.filename, m.filename, sizeof(info.filename) - 1);
+    snprintf(info.path, sizeof(info.path), "%s/%s", hsDir, m.filename);
+    strncpy(info.ssid, m.ssid, sizeof(info.ssid) - 1);
+    strncpy(info.bssid, m.bssid, sizeof(info.bssid) - 1);
+    strncpy(info.bssidHex, m.bssidHex, sizeof(info.bssidHex) - 1);
+    info.fileSize = m.fileSize;
+    info.isPMKID = m.isPMKID;
+    info.status = PwnCaptureStatus::LOCAL;
+    info.password[0] = '\0';
+
+    // Password lookup: BSSID hex, SSID, then filename
+    const char* pw = "";
+    if (m.bssidHex[0]) pw = Pwncrack::getPassword(m.bssidHex);
+    if ((!pw || pw[0] == '\0') && m.ssid[0]) pw = Pwncrack::getPassword(m.ssid);
+    if ((!pw || pw[0] == '\0') && m.filename[0]) pw = Pwncrack::getPassword(m.filename);
+    if (pw && pw[0] != '\0') {
+        info.status = PwnCaptureStatus::CRACKED;
+        strncpy(info.password, pw, sizeof(info.password) - 1);
+        info.password[sizeof(info.password) - 1] = '\0';
+    } else if (Pwncrack::isUploaded(m.filename) ||
+               (m.bssidHex[0] && Pwncrack::isUploaded(m.bssidHex))) {
+        info.status = PwnCaptureStatus::UPLOADED;
+    }
+    return info;
 }
 
 void PwncrackMenu::scanFiles() {
-    files.clear();
-    files.reserve(24);
+    metas.clear();
+    selectedInfoValid = false;
+
+    // Heap gate: PwnFileMeta is ~120B (filename+ssid+bssid+bssidHex+size+isPMKID).
+    // 200 metas = ~24KB, but reserve() needs the biggest single block.
+    // Try 200 first, shrink if heap fragmented.
+    constexpr uint16_t kMaxSlots = 200;
+    uint16_t maxSlots = kMaxSlots;
+    const size_t kPerSlot = 128;  // sizeof(PwnFileMeta) + allocator overhead
+
+    size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    size_t freeHeap = ESP.getFreeHeap();
+
+    // Adaptive: shrink the cap to what we can actually fit safely.
+    while (maxSlots > 20 &&
+           (largest < (size_t)maxSlots * kPerSlot / 2 ||
+            freeHeap < (size_t)maxSlots * kPerSlot * 2)) {
+        maxSlots = (uint16_t)(maxSlots * 3 / 4);  // geometric shrink
+        if (maxSlots > 40) maxSlots -= 8;
+    }
+
+    if (freeHeap < 8 * 1024 || largest < 4 * 1024) {
+        Serial.printf("[PWNCRACK] Scan skipped — heap too low: free=%u largest=%u\n",
+                      (unsigned)freeHeap, (unsigned)largest);
+        Display::showToast("LOW HEAP — RETRY", 1500);
+        return;
+    }
+
+    Serial.printf("[PWNCRACK] scanFiles cap=%u (free=%u largest=%u)\n",
+                  (unsigned)maxSlots, (unsigned)freeHeap, (unsigned)largest);
+
+    metas.reserve(maxSlots);
     const char* hsDir = SDLayout::handshakesDir();
     if (!hsDir || !SD.exists(hsDir)) {
         Serial.printf("[PWNCRACK] No handshakes dir: %s\n", hsDir ? hsDir : "(null)");
@@ -205,37 +247,40 @@ void PwncrackMenu::scanFiles() {
     }
 
     File entry = dir.openNextFile();
-    uint8_t n = 0;
-    while (entry && files.size() < 40) {
+    uint16_t n = 0;
+    while (entry && metas.size() < maxSlots) {
         if (!entry.isDirectory()) {
             const char* raw = entry.name();
             const char* slash = strrchr(raw, '/');
             const char* base = slash ? slash + 1 : raw;
-            // pwncrack wants hashcat 22000 (site: .hc22000; we also list .22000)
             bool ok = endsWithCI(base, ".22000") || endsWithCI(base, ".hc22000");
             if (ok) {
-                PwnFileInfo info{};
-                strncpy(info.filename, base, sizeof(info.filename) - 1);
-                if (raw[0] == '/') {
-                    strncpy(info.path, raw, sizeof(info.path) - 1);
-                } else {
-                    snprintf(info.path, sizeof(info.path), "%s/%s", hsDir, base);
-                }
-                info.fileSize = entry.size();
-                parseNameMeta(info);
-                info.status = PwnCaptureStatus::LOCAL;
-                info.password[0] = '\0';
-                files.push_back(info);
+                PwnFileMeta m{};
+                strncpy(m.filename, base, sizeof(m.filename) - 1);
+                m.fileSize = entry.size();
+
+                // Reuse parser — it fills ssid/bssid/bssidHex/isPMKID
+                PwnFileInfo tmp{};
+                strncpy(tmp.filename, m.filename, sizeof(tmp.filename) - 1);
+                parseNameMeta(tmp);
+                strncpy(m.ssid, tmp.ssid, sizeof(m.ssid) - 1);
+                strncpy(m.bssid, tmp.bssid, sizeof(m.bssid) - 1);
+                strncpy(m.bssidHex, tmp.bssidHex, sizeof(m.bssidHex) - 1);
+                m.isPMKID = tmp.isPMKID;
+
+                metas.push_back(m);
                 n++;
             }
         }
         entry.close();
         entry = dir.openNextFile();
-        if ((n % 8) == 0) yield();
+        if ((n % 16) == 0) yield();
     }
     dir.close();
-    refreshStatuses();
-    Serial.printf("[PWNCRACK] Scan %s: %u hash files\n", hsDir, (unsigned)files.size());
+
+    selectedInfoValid = false;
+    Serial.printf("[PWNCRACK] Scan %s: %u hash files (cap=%u)\n",
+                  hsDir, (unsigned)metas.size(), (unsigned)maxSlots);
 }
 
 void PwncrackMenu::show() {
@@ -247,10 +292,12 @@ void PwncrackMenu::show() {
     detailViewActive = false;
     syncState = PwnSyncState::IDLE;
     hintIndex = esp_random() % HINT_COUNT;
+    selectedInfoValid = false;
 
     ensureKeyLoaded();
     Pwncrack::loadCache();
     scanFiles();
+    refreshSelected();  // populate selectedInfo so first-row ST shows on first frame
 
     if (Pwncrack::hasApiKey()) {
         Display::showToast("PWNCRACK KEY OK", 1200);
@@ -276,7 +323,7 @@ const char* PwncrackMenu::getBottomHint() {
     if (!Pwncrack::hasApiKey()) {
         return "R:LOAD KEY  T:TEST  ESC";
     }
-    if (files.empty()) {
+    if (metas.empty()) {
         return "NO HASH  OINK FIRST  T:TEST";
     }
     return HINTS[hintIndex % HINT_COUNT];
@@ -287,8 +334,9 @@ void PwncrackMenu::hide() {
     syncModalActive = false;
     detailViewActive = false;
     syncState = PwnSyncState::IDLE;
-    files.clear();
-    files.shrink_to_fit();
+    metas.clear();
+    metas.shrink_to_fit();
+    selectedInfoValid = false;
     Pwncrack::freeCacheMemory();
     if (WiFi.status() == WL_CONNECTED) {
         disconnectWiFi();
@@ -355,10 +403,10 @@ void PwncrackMenu::startSync() {
         Display::showToast("NO KEY", 1500);
         return;
     }
-    if (files.empty()) {
+    if (metas.empty()) {
         scanFiles();
     }
-    if (files.empty()) {
+    if (metas.empty()) {
         strncpy(syncError, "NO .22000 FILES", sizeof(syncError) - 1);
         syncState = PwnSyncState::ERROR;
         Display::showToast("NO .22000 IN HANDSHAKES", 2000);
@@ -462,7 +510,7 @@ void PwncrackMenu::handleInput() {
                 syncModalActive = false;
                 syncState = PwnSyncState::IDLE;
                 Pwncrack::loadCache();
-                refreshStatuses();
+                refreshSelected();
             }
         }
         return;
@@ -489,21 +537,24 @@ void PwncrackMenu::handleInput() {
         if (selectedIndex > 0) {
             selectedIndex--;
             if (selectedIndex < scrollOffset) scrollOffset = selectedIndex;
+            refreshSelected();
         }
     }
     if (M5Cardputer.Keyboard.isKeyPressed('.')) {
         hintIndex = (hintIndex + 1) % HINT_COUNT;
-        if (!files.empty() && selectedIndex + 1 < files.size()) {
+        if (!metas.empty() && selectedIndex + 1 < metas.size()) {
             selectedIndex++;
             if (selectedIndex >= scrollOffset + VISIBLE_ITEMS) {
                 scrollOffset = selectedIndex - VISIBLE_ITEMS + 1;
             }
+            refreshSelected();
         }
     }
 
     // Enter → detail (password if [OK])
     if (keys.enter) {
-        if (!files.empty() && selectedIndex < files.size()) {
+        if (!metas.empty() && selectedIndex < metas.size()) {
+            refreshSelected();  // make sure detail view shows current status
             detailViewActive = true;
         }
         return;
@@ -545,7 +596,7 @@ void PwncrackMenu::handleInput() {
         }
         Pwncrack::freeCacheMemory();
         Pwncrack::loadCache();
-        refreshStatuses();
+        refreshSelected();
         Display::showToast("UPLOAD LOG CLEARED", 2000);
         return;
     }
@@ -630,8 +681,8 @@ void PwncrackMenu::drawSyncModal(M5Canvas& canvas) {
 }
 
 void PwncrackMenu::drawDetailView(M5Canvas& canvas) {
-    if (selectedIndex >= files.size()) return;
-    const PwnFileInfo& f = files[selectedIndex];
+    if (selectedIndex >= metas.size()) return;
+    const PwnFileInfo& f = selectedInfo;
 
     const int boxW = 220;
     const int boxH = 78;
@@ -709,13 +760,20 @@ void PwncrackMenu::draw(M5Canvas& canvas) {
         return;
     }
 
-    // Summary — like HASHES LOOT line
-    uint16_t total = (uint16_t)files.size();
+    // Summary — like HASHES LOOT line. We only materialize visible window for status counts;
+    // full scan would defeat the pagination purpose.
+    uint16_t total = (uint16_t)metas.size();
     uint16_t cracked = 0, uploaded = 0, local = 0;
-    for (const auto& f : files) {
-        if (f.status == PwnCaptureStatus::CRACKED) cracked++;
-        else if (f.status == PwnCaptureStatus::UPLOADED) uploaded++;
-        else local++;
+    const char* hsDir = SDLayout::handshakesDir();
+    if (!metas.empty()) {
+        // Count statuses in visible window + small buffer (fast, bounded heap)
+        uint8_t scanEnd = (uint8_t)min((int)total, (int)(scrollOffset + VISIBLE_ITEMS + 4));
+        for (uint8_t i = scrollOffset; i < scanEnd; i++) {
+            PwnFileInfo tmp = materialize(metas[i], hsDir);
+            if (tmp.status == PwnCaptureStatus::CRACKED) cracked++;
+            else if (tmp.status == PwnCaptureStatus::UPLOADED) uploaded++;
+            else local++;
+        }
     }
 
     char summary[64];
@@ -730,7 +788,7 @@ void PwncrackMenu::draw(M5Canvas& canvas) {
     canvas.setCursor(canvas.width() - 42, 2);
     canvas.print(Pwncrack::hasApiKey() ? "KEY" : "NOKEY");
 
-    if (files.empty()) {
+    if (metas.empty()) {
         canvas.setTextColor(UiStyle::GOLD);
         canvas.setCursor(4, 36);
         canvas.print("NO .22000 HASH FILES");
@@ -762,8 +820,10 @@ void PwncrackMenu::draw(M5Canvas& canvas) {
     int y = 22;
     const int lineHeight = 16;
 
-    for (uint8_t i = scrollOffset; i < files.size() && i < scrollOffset + VISIBLE_ITEMS; i++) {
-        const PwnFileInfo& f = files[i];
+    for (uint8_t i = scrollOffset; i < metas.size() && i < scrollOffset + VISIBLE_ITEMS; i++) {
+        // Lazy materialize: builds a full PwnFileInfo with status+password just for drawing
+        const PwnFileMeta& m = metas[i];
+        PwnFileInfo f = materialize(m, SDLayout::handshakesDir());
         bool sel = (i == selectedIndex);
         uiListRow(canvas, y, lineHeight, sel, UiStyle::PINK);
         canvas.setTextColor(sel ? UiStyle::BG : UiStyle::TEXT);
@@ -812,7 +872,7 @@ void PwncrackMenu::draw(M5Canvas& canvas) {
         canvas.setCursor(canvas.width() - 10, 22);
         canvas.print("^");
     }
-    if (scrollOffset + VISIBLE_ITEMS < files.size()) {
+    if (scrollOffset + VISIBLE_ITEMS < metas.size()) {
         canvas.setCursor(canvas.width() - 10, 22 + (VISIBLE_ITEMS - 1) * lineHeight);
         canvas.print("v");
     }

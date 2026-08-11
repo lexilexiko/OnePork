@@ -56,6 +56,26 @@ public:
     // Status
     static const char* getLastError();
 
+    // Step-by-step reachability / config probe (for T-key diagnostic, no network call)
+    struct WPASecDiagResult {
+        bool keyOk;           // API key configured + 32 hex chars
+        bool wifiOk;          // WiFi.status() == WL_CONNECTED
+        bool ssidConfigured;  // SSID set in config (not empty)
+        bool cacheLoaded;     // Cache successfully loaded
+        bool canSyncOk;       // Heap gates passed (would TLS work?)
+        uint16_t crackedCount;
+        uint16_t uploadedCount;
+        uint32_t freeHeap;
+        uint32_t largestBlock;
+        char ssid[33];
+        char ip[16];
+        char rssi[8];
+        char detail[48];      // last failure reason / summary line
+        char lines[8][28];    // short UI lines
+        uint8_t lineCount;
+    };
+    static WPASecDiagResult runDiagnostics();
+
     /**
      * @brief Free cached WPA-SEC results from memory.
      *
