@@ -319,11 +319,9 @@ void WPASec::freeCacheMemory() {
     size_t crackedCount = crackedCache.size();
     size_t uploadedCount = uploadedCache.size();
     crackedCache.clear();
-    crackedCache.shrink_to_fit();
     uploadedCache.clear();
-    uploadedCache.shrink_to_fit();
     cacheLoaded = false;
-    Serial.printf("[WPASEC] Freed cache: %u cracked, %u uploaded\n",
+    Serial.printf("[WPASEC] Cleared cache: %u cracked, %u uploaded\n",
                   (unsigned int)crackedCount, (unsigned int)uploadedCount);
 }
 

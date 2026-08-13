@@ -13,6 +13,7 @@
 #include <SD.h>
 #include <string.h>
 #include <ctype.h>
+#include <esp_heap_caps.h>
 
 bool PwncrackMenu::active = false;
 bool PwncrackMenu::keyWasPressed = false;
@@ -233,7 +234,8 @@ void PwncrackMenu::scanFiles() {
     Serial.printf("[PWNCRACK] scanFiles cap=%u (free=%u largest=%u)\n",
                   (unsigned)maxSlots, (unsigned)freeHeap, (unsigned)largest);
 
-    metas.reserve(maxSlots);
+    // Never reserve() here — HASHES already crashed on reserve() after WPA-SEC.
+    // push_back grows one slot at a time; we stop at maxSlots.
     const char* hsDir = SDLayout::handshakesDir();
     if (!hsDir || !SD.exists(hsDir)) {
         Serial.printf("[PWNCRACK] No handshakes dir: %s\n", hsDir ? hsDir : "(null)");
@@ -255,6 +257,12 @@ void PwncrackMenu::scanFiles() {
             const char* base = slash ? slash + 1 : raw;
             bool ok = endsWithCI(base, ".22000") || endsWithCI(base, ".hc22000");
             if (ok) {
+                size_t largestNow = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+                if (largestNow < 512) {
+                    Serial.println("[PWNCRACK] Scan stop — heap too fragmented");
+                    entry.close();
+                    break;
+                }
                 PwnFileMeta m{};
                 strncpy(m.filename, base, sizeof(m.filename) - 1);
                 m.fileSize = entry.size();
@@ -335,7 +343,8 @@ void PwncrackMenu::hide() {
     detailViewActive = false;
     syncState = PwnSyncState::IDLE;
     metas.clear();
-    metas.shrink_to_fit();
+    // Do not shrink_to_fit — same abort as HASHES captures.reserve on a
+    // fragmented heap (exceptions off → std::terminate → reboot).
     selectedInfoValid = false;
     Pwncrack::freeCacheMemory();
     if (WiFi.status() == WL_CONNECTED) {

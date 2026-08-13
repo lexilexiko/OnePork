@@ -51,11 +51,9 @@ bool Pwncrack::hasApiKey() {
 
 void Pwncrack::freeCacheMemory() {
     crackedCache.clear();
-    crackedCache.shrink_to_fit();
     uploadedCache.clear();
-    uploadedCache.shrink_to_fit();
     cacheLoaded = false;
-    Serial.println("[PWNCRACK] Cache freed");
+    Serial.println("[PWNCRACK] Cache cleared");
 }
 
 bool Pwncrack::loadUploadedList() {

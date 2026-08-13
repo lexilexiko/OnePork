@@ -885,8 +885,10 @@ void stop() {
 void freeNetworks() {
     taskENTER_CRITICAL(&vectorMux);
     networks.clear();
-    networks.shrink_to_fit();
     taskEXIT_CRITICAL(&vectorMux);
+    // shrink outside the spinlock — malloc/free inside a critical section
+    // can abort. After clear() this only returns the old block.
+    networks.shrink_to_fit();
     Serial.println("[RECON] Networks vector freed");
 }
 

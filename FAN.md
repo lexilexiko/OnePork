@@ -4,9 +4,10 @@ This file is the **changelog of fan work** on top of upstream **M5PORKCHOP**.
 
 | | |
 |--|--|
-| **Current** | **v0.1.8c (1.6)** pWnCrack |
+| **Current** | **v0.1.8c (1.6.5)** |
 | **Upstream base** | 0.1.8c |
-| **Main README** | [README.md](README.md) — install, bugs table, how to report |
+| **Main README** | [README.md](README.md) — install, **capability map**, bugs table, how to report |
+| **Release notes 1.6.5** | [releases/RELEASE_NOTES_1.6.5.md](releases/RELEASE_NOTES_1.6.5.md) |
 | **Release notes 1.6** | [releases/RELEASE_NOTES_1.6.md](releases/RELEASE_NOTES_1.6.md) |
 
 ---
@@ -32,6 +33,22 @@ Not a rewrite of the barn — **extra straw**:
 - Cloud: WPA-SEC (upstream-style) + **pwncrack.org** (1.6, separate)  
 - Skins: CLASSIC / BLUSH / HOG / **ZOMBIE** (unlock) / RETRO  
 - Packaging: One Pork branding, auto-OINK warm-up, prebuilt bins under `releases/`
+
+---
+
+## v1.6.5 — loot menu reboot
+
+### Appeared / fixed
+
+| Item | Description |
+|------|-------------|
+| **HASHES ↔ PWNCRACK** | No more hard reboot when swapping loot menus |
+| PWNCRACK list | No `reserve` / `shrink_to_fit` (same rule HASHES already used) |
+| Cloud caches | `clear()` only |
+| `freeNetworks` | Shrink outside the Wi-Fi spinlock |
+| README | Full capability map + “this is a fanfic with a compiler” |
+
+A larger WiFiService rewrite was **tried and reverted** — it ate heap and broke XFER/Blues. 1.6.5 stays surgical.
 
 ---
 

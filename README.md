@@ -1,15 +1,14 @@
 # One Pork
 
-**Fan package** of [M5PORKCHOP](https://github.com/0ct0sec/M5PORKCHOP) for **M5Cardputer** (ESP32-S3) (Recommended for Cardputer ADV) .
+**Fan package** of [M5PORKCHOP](https://github.com/0ct0sec/M5PORKCHOP) for **M5Cardputer** (ESP32-S3).  
+Recommended: **Cardputer ADV**.
 
 | | |
 |--|--|
-| **Version** | **v0.1.8c (1.6)** — *pWnCrack* |
+| **Version** | **v0.1.8c (1.6.5)** |
 | **Upstream base** | M5PORKCHOP **0.1.8c** |
 | **This repo** | https://github.com/lexilexiko/OnePork |
 | **Upstream** | https://github.com/0ct0sec/M5PORKCHOP |
-| ** 
-To fix the PWNCRACK crash/reboot issue, delete all files except the key; you can do this via the launcher or within OnePork itself. ||
 
 ```
         ^__^
@@ -17,20 +16,20 @@ To fix the PWNCRACK crash/reboot issue, delete all files except the key; you can
         (__)\       )\/\
             ||----w |
             ||     ||
-   fan straw · real pig is 0ct0's
+   fan straw · the real pig is 0ct0's
 ```
 
 ---
 
-## Credits (read first)
+## This is a fan mod
 
-| Who | Role |
-|-----|------|
-| **0ct0** | **Original author** of M5PORKCHOP — owner of the barn |
-| **Donate** | **https://buymeacoffee.com/0ct0** ← please donate here |
-| **lexilexiko** | Fan packaging only — **not** the original author |
+**One Pork is a fan-made package.** It is **not** official M5PORKCHOP.
 
-If the pig makes you happy, **support 0ct0**, not only the fan fork.
+Everything extra here — seasons, wolf, Fruit Run, IR packs, RANK/XP theatre, pwncrack client, zombie pig, monologues, the whole barn aesthetic — is **lexilexiko’s mad fantasy** stacked on top of 0ct0’s original firmware.
+
+- The **original author** is **0ct0**. Donate there: **https://buymeacoffee.com/0ct0**
+- **lexilexiko** only packages, paints, and breaks things in entertaining ways.
+- If a feature feels unhinged, that’s the point. If a radio trick feels cursed, that’s the ESP32.
 
 License: MIT — Copyright (c) 2025 **0ct0** (`LICENSE`).
 
@@ -38,11 +37,9 @@ License: MIT — Copyright (c) 2025 **0ct0** (`LICENSE`).
 
 ## What is this?
 
-**One Pork** = upstream M5PORKCHOP **plus** fan features (seasons, Fruit Run, IR, RANK/XP polish, **pwncrack.org**, zombie skin unlock, etc.).
+A **pocket lab** on a Cardputer: Wi-Fi recon, handshake/PMKID capture, GPS wardrive, BLE lab, IR toys, a pig that lives on the screen, and a little XP cult.
 
-It is a **learning / lab tool** for WiFi security research on a pocket keyboard.
-
-**Legal:** only networks you own or have **written** permission to test.  
+**Legal:** only networks you **own** or have **written** permission to test.  
 “Because it can” is not a defense. Know your local law.
 
 ---
@@ -50,11 +47,10 @@ It is a **learning / lab tool** for WiFi security research on a pocket keyboard.
 ## Quick flash (no build)
 
 1. Download:  
-   [`releases/OnePork_v0.1.8c-1.6_m5cardputer_firmware.bin`](releases/OnePork_v0.1.8c-1.6_m5cardputer_firmware.bin)
+   [`releases/OnePork_v0.1.8c-1.6.5_m5cardputer_firmware.bin`](releases/OnePork_v0.1.8c-1.6.5_m5cardputer_firmware.bin)
 2. Flash with **M5 Launcher** (keeps XP/NVS) or M5Burner / esptool  
-3. Reboot → ~5s auto-OINK warm-up  
-4. Full release notes: [`releases/RELEASE_NOTES_1.6.md`](releases/RELEASE_NOTES_1.6.md)  
-5. Fan feature list / history: [`FAN.md`](FAN.md)
+3. Reboot. Default boot still warms radio with **OINK ~5s** unless you change Settings → BOOT MODE *and* the firmware honors IDLE.  
+4. Notes: [`releases/RELEASE_NOTES_1.6.5.md`](releases/RELEASE_NOTES_1.6.5.md)
 
 ### Build yourself
 
@@ -65,98 +61,222 @@ pio run -t upload -e m5cardputer
 
 ---
 
-## What’s new in **1.6** (highlight)
+## What’s new in **1.6.5**
 
-| Feature | Where | Notes |
-|---------|--------|--------|
-| **PWNCRACK** | LOOT → PWNCRACK | [pwncrack.org](https://pwncrack.org/) — **not** WPA-SEC |
-| Setup | SD `m5porkchop/pwncrack/key.txt` | **R** load key · **S** sync · **T** net test · **C** clear upload log |
-| UI | like HASHES | SSID / ST / TYPE / SIZE · Enter = password if `[OK]` |
-| Boot splash | on power-on | pwncrack setup + zombie teaser |
-| **ZOMBIE skin** | Settings → PIG SKIN | Locked until **3 night wolf bites**; then selectable; wolf won’t bite zombie pig |
+| Change | Why |
+|--------|-----|
+| **HASHES ↔ PWNCRACK no longer hard-reboots** | PWNCRACK used `vector::reserve` / `shrink_to_fit` on a fragmented heap. ESP32 has **no C++ exceptions** → `abort()` → reboot. HASHES already avoided this; PWNCRACK now matches. |
+| Cache clear without shrink | WPA-SEC / PWNCRACK caches `clear()` only |
+| Safer `NetworkRecon::freeNetworks()` | `shrink_to_fit` no longer runs inside a spinlock |
+| Honest docs | This README is now a **full capability map**, not just a 1.6 teaser |
 
-Older fan history (1.4 → 1.4.6): see **[FAN.md](FAN.md)**.
-
----
-
-## Modes (short)
-
-| Key | Mode | Idea |
-|-----|------|------|
-| **O** | OINK | Capture handshakes / PMKID |
-| **D** | DO NO HAM | Passive-only recon |
-| **W** | WARHOG | GPS wardrive |
-| **H** | SPECTRUM | RF view |
-| **B** | PIGGY BLUES | BLE spam (lab) |
-| **F** | FILE XFER | Web UI over WiFi |
-| **G** | FRUIT RUN | Mini-game |
-| **I** | 1RP0RK | IR power packs |
-| **P** | PIGPASS | Offline WPA lab crack |
-| **M** | MICPORK | Mic spectrometer toy |
-| **E** | EVILPIG | SoftAP captive portal (lab) |
-| **S** | FLEXES | XP / RANK / GR1ND |
-| LOOT | HASHES | WPA-SEC list |
-| LOOT | **PWNCRACK** | pwncrack.org |
-| MENU | BACON / RANK / … | More modes |
-
-Full upstream-style detail still lives in spirit of M5PORKCHOP; this README is the **fan front door**.
+Older 1.6 work (pwncrack.org client, zombie skin) stays.  
+We did **not** ship the big WiFiService rewrite — it hurt heap/XFER/Blues on device.
 
 ---
 
-## PWNCRACK setup (1.6)
+# Capability map
 
-1. Get a key at [pwncrack.org](https://pwncrack.org/)  
-2. Put on SD: `/m5porkchop/pwncrack/key.txt`  
-3. Set home WiFi (same as XFER / OTA SSID + password)  
-4. Capture `.22000` with **OINK**  
-5. LOOT → **PWNCRACK** → **R** (key) → **S** (upload + potfile)  
-6. **T** = network self-test if something fails  
-
-Details: [`releases/RELEASE_NOTES_1.6.md`](releases/RELEASE_NOTES_1.6.md)
-
----
-
-## Known bugs & status
-
-ESP32-S3 = **one radio**, small heap, **no C++ exceptions**.  
-Failed big `vector::reserve` → **hard reboot**. We ship **honest** workarounds.
-
-| ID | Area | Symptom | Status | Workaround / note |
-|----|------|---------|--------|-------------------|
-| **B01** | HASHES → PWNCRACK | Reboot after WPA-SEC then open PWN | ⚠️ known | After reboot OK. Or wait / OINK once. Prefer reboot over “radio fix” that killed WiFi |
-| **B02** | XFER → PWNCRACK | Reboot after File Transfer then PWN | ⚠️ known | Same as B01 |
-| **B03** | STA internet | S / XFER “no WiFi” | ⚠️ sometimes | Check OTA SSID/pass; run **OINK** 10–20s; **T** in PWNCRACK |
-| **B04** | After BLUES | Net flaky / need OINK | ⚠️ known | OINK warm-up or reboot; NimBLE leaves heap hot |
-| **B05** | PWN upload | UP=0 SKIP=N, site empty | ⚠️ user | **C** clear upload log → **S** again; same key on site |
-| **B06** | PWN ST `[..]` forever | Waiting for GPU crack | ✅ expected | Press **S** later for potfile; not a hang |
-| **B07** | BLUES after OINK | Hard reset on exit (old) | ✅ mitigated | 1.3 radio handoff + auto-OINK (1.4.6) |
-| **B08** | EVILPIG portal | Phone won’t open portal (old) | ✅ fixed | 1.4.1 captive portal probes |
-| **B09** | Experimental radio borrow | “Fixed” reboot, **broke STA** | ✅ rejected | Not shipped in 1.6; rare reboot preferred |
-| **B10** | ZOMBIE skin | Locked in settings | ✅ intended | 3 night wolf bites unlock |
-
-**Legend:** ⚠️ open / accepted kludge · ✅ fixed or intentional
-
----
-
-## How to report a bug (please do)
-
-Reports help more than silence. Prefer **GitHub Issues**:  
-https://github.com/lexilexiko/OnePork/issues
-
-### Please include
-
-1. **Firmware version** — splash / About: `v0.1.8c (1.6)`  
-2. **What you did** — exact path, e.g. `OINK → HASHES S → PWNCRACK`  
-3. **What happened** — reboot / no WiFi / freeze / wrong UI  
-4. **What you expected**  
-5. **How often** — every time / sometimes / once  
-6. **Workaround?** — reboot, OINK, etc.  
-7. Optional: Serial log, photo of screen, SD layout notes  
-
-### Template
+One pig. One radio. Many moods.
 
 ```text
-Version: v0.1.8c (1.6)
+ONEPORK
+│
+├── RADIO
+│   ├── OINK            capture HS / PMKID
+│   ├── DO NO HAM       passive recon (no attacks)
+│   ├── WARHOG          GPS wardrive
+│   ├── SPECTRUM        RF view
+│   └── PIGGY BLUES     BLE lab
+│
+├── GAMES / TOYS
+│   ├── FRUIT RUN
+│   ├── 1RP0RK (IR)
+│   └── RANK / FLEXES / GR1ND
+│
+├── LOOT / CLOUD
+│   ├── HASHES → WPA-SEC
+│   ├── PWNCRACK → pwncrack.org
+│   └── TRACKS → WiGLE
+│
+├── SCENE
+│   ├── AVATAR / PIGLET
+│   ├── WOLF
+│   ├── TREES / FRUIT
+│   ├── WEATHER / SEASONS / FX
+│   └── MOOD / MONOLOGUE / RETRO
+│
+├── WEB
+│   ├── FILE XFER
+│   └── EVILPIG
+│
+└── CORE
+    ├── NetworkRecon / WiFiUtils
+    ├── SD / SDLayout / SDLog
+    ├── Config / XP
+    ├── GPS / JanusHog (C5)
+    └── HeapPolicy / HeapHealth
+```
+
+### Hotkeys (from idle)
+
+| Key | Mode | What it does |
+|-----|------|----------------|
+| **O** | OINK | Deauth + sniff. Captures handshakes / PMKID to SD (`.pcap` + `.22000`). |
+| **D** | DO NO HAM | Passive only. Listens, does not attack. |
+| **W** | WARHOG | GPS wardrive. Logs CSV + WiGLE tracks. |
+| **H** | SPECTRUM | Channel / RSSI view, 2.4 + C5 5 GHz if JanusHog is up. |
+| **B** | PIGGY BLUES | BLE advertise / scan lab. Heavy on heap. |
+| **F** | FILE XFER | Connects to home Wi-Fi, web UI for SD files. |
+| **G** | FRUIT RUN | Jump / collect fruit. Wolf can visit. |
+| **I** | 1RP0RK | IR power packs (NA/EU) + custom `/ir` files. |
+| **P** | PIGPASS | Offline WPA lab (wordlist / mask on SD). |
+| **M** | MICPORK | Mic spectrum toy (ADV codec). |
+| **E** | EVILPIG | SoftAP captive portal **lab** (authorized nets only). |
+| **S** | FLEXES | Lifetime XP / RANK / GR1ND. |
+| **T** | SETTINGS | Skins, Wi-Fi, GPS, C5, boot mode, sound… |
+| **C** | CHARGING | Low-power charging screen. |
+| `` ` `` / ESC | back | Leave a mode → idle / menu. |
+
+### Menu map
+
+| Group | Items |
+|-------|--------|
+| **ATTACK** | OINK, PIGGY BLUES, EVILPIG, 1RP0RK |
+| **RECON** | DO NO HAM, WARHOG, SPECTRUM, MICPORK |
+| **LOOT** | HASHES (WPA-SEC), **PWNCRACK**, TRACKS (WiGLE), BOUNTY, PIGPASS |
+| **COMMS** | PIGSYNC, BACON, FILE XFER, JANUS HOG |
+| **RANK** | FLEXES, BADGES, UNLOCKABLES, FRUIT RUN, D3M4NDS |
+| **SYSTEM** | SETTINGS, BOAR BROS, FILES, COREDUMP, DIAG, SD FORMAT, CHARGING, ABOUT |
+
+### Radio / capture
+
+| Function | Where | Notes |
+|----------|--------|--------|
+| **OINK** | `modes/oink` | Handshake + PMKID. Uses NetworkRecon promiscuous hop. Saves under `/m5porkchop/handshakes/`. |
+| **DO NO HAM** | `modes/do_no_ham` | Same ears, no teeth. Safer for “just look”. |
+| **WARHOG** | `modes/warhog` | STA scan + GPS. Writes wardrive CSV + WiGLE CSV. Dual-band extras from C5. |
+| **SPECTRUM** | `modes/spectrum` | Live RF picture. Can lock a channel / peek clients. |
+| **NetworkRecon** | `core/network_recon` | Shared background scan / hop / network list for OINK, DNH, SPECTRUM. |
+| **WSL bypasser** | `core/wsl_bypasser` | Raw frames (deauth etc.) for lab modes. |
+
+### Cloud / loot (three separate pipes)
+
+Do **not** merge these. Different sites, keys, folders.
+
+| Function | Menu | Cloud | SD |
+|----------|------|--------|-----|
+| **HASHES** | LOOT → HASHES | [WPA-SEC](https://wpa-sec.stanev.org/) | `/m5porkchop/` WPA-SEC key + potfile |
+| **PWNCRACK** | LOOT → PWNCRACK | [pwncrack.org](https://pwncrack.org/) | `/m5porkchop/pwncrack/key.txt` |
+| **TRACKS** | LOOT → TRACKS | [WiGLE](https://wigle.net/) | WARHOG CSVs + WiGLE creds |
+
+**PWNCRACK (1.6+)**
+
+1. Get a key on pwncrack.org  
+2. SD: `/m5porkchop/pwncrack/key.txt`  
+3. Same home Wi-Fi as XFER (OTA SSID + password)  
+4. Capture `.22000` with **OINK**  
+5. **R** load key · **S** upload + potfile · **T** net test · **C** clear upload log  
+6. ST column: `[--]` local · `[..]` uploaded · `[OK]` cracked  
+
+If PWNCRACK used to reboot after opening: **1.6.5** stops the `reserve()` crash. If the list is dirty from older builds, delete extra files in `pwncrack/` **except** `key.txt` (via FILES or M5 Launcher).
+
+### Scene / piglet (the fantasy layer)
+
+| Piece | Role |
+|-------|------|
+| **Avatar** | The pig. Walk, sit, hunt, blush, hog, zombie, retro. |
+| **Mood / monologue** | Status lines, insults, timing. |
+| **Wolf** | Night visitor. Three night bites unlock **ZOMBIE** skin. Wolf ignores zombie pig. |
+| **Trees / fruit** | Ambient trees + Fruit Run pickups. |
+| **Weather / seasons / FX** | Rain, snow, leaves, day/night. |
+| **RETRO** | B&W film world / pixel rain. |
+| **SFX** | Beeps, oinks, sirens. MICPORK and IR steal the speaker briefly. |
+| **G0 quiet dark** | Dim / quiet screen. |
+
+Skins: CLASSIC / BLUSH / HOG / **ZOMBIE** (unlock) / RETRO.
+
+### Toys / extra modes
+
+| Function | Idea |
+|----------|------|
+| **FRUIT RUN** | Chrome-dino energy. Jump, fruit, wolf. |
+| **1RP0RK** | IR blast. Built-in NA/EU power packs + `/ir/*.txt`. |
+| **BACON** | Beacon hide-and-seek toy. |
+| **PIGSYNC** | ESP-NOW sync with another One Pork / Sirloin-style device. |
+| **PIGPASS** | Offline crack lab (PBKDF2). Parks the scene so the pig doesn’t eat the heap. |
+| **MICPORK** | Microphone spectrum dance (ADV). |
+| **EVILPIG** | Clone AP + captive portal. **Lab / authorized only.** |
+| **FILE XFER** | Browser file manager over STA. Needs home Wi-Fi. |
+| **JANUS HOG** | ESP32-C5 UART coprocessor: 5 GHz scan / extra GPS. |
+| **FILES** | Browse / delete SD + SPIFFS. |
+| **SD FORMAT** | Nuclear option. Reboot after. |
+| **CHARGING** | Sleeps radio/GPS, dim screen. |
+| **COREDUMP / DIAG** | Crash log + heap snapshot. |
+| **BOAR BROS** | Networks you refuse to bully. |
+| **BOUNTY / BADGES / UNLOCK / D3M4NDS** | XP theatre. |
+
+### Core services (not modes)
+
+| Service | Job |
+|---------|-----|
+| **Config / NVS** | Settings, skins, boot mode, keys pointers. |
+| **XP** | Rank, session bonuses, persistence. |
+| **SDLayout** | One folder tree under `/m5porkchop/`. |
+| **SDLog** | Text logs on card. |
+| **HeapPolicy / HeapHealth / HeapGates** | Thresholds, toasts, TLS gates. |
+| **GPS / JanusHog** | Internal UART GPS vs C5. Shared pins → GPS sleeps. |
+
+---
+
+## SD layout
+
+```text
+/m5porkchop/
+  handshakes/          .pcap / .22000
+  pwncrack/
+    key.txt
+    key.txt.imported
+    results / uploaded lists
+  wpa-sec/             WPA-SEC key + potfile
+  wigle/               WiGLE credentials
+  wardriving/          WARHOG CSV / WiGLE tracks
+  models/              optional ML
+  logs/ crash/ screenshots/
+/ir/                   custom IR packs
+```
+
+---
+
+## Bugs — what 1.6.5 fixed, what’s still a pig
+
+ESP32-S3 = **one radio**, small heap, **no C++ exceptions**.  
+A failed big `vector::reserve` / `shrink_to_fit` → **hard reboot**. We document that instead of pretending the barn is marble.
+
+| ID | Area | Symptom | 1.6.5 |
+|----|------|---------|--------|
+| **B01** | HASHES → PWNCRACK | Reboot when switching loot menus | **Fixed** — no more `reserve`/`shrink_to_fit` on that path |
+| **B02** | XFER → PWNCRACK | Reboot after file transfer | **Mitigated** same heap rule; still go easy after TLS |
+| **B03** | STA internet | S / XFER “no WiFi” | ⚠️ sometimes — check OTA SSID/pass; **OINK** 10–20s; **T** in PWNCRACK |
+| **B04** | After BLUES | Net flaky | ⚠️ known — OINK warm-up or reboot |
+| **B05** | PWN upload | UP=0 SKIP=N | ⚠️ user — **C** clear log → **S**; same key on site |
+| **B06** | PWN ST `[..]` | Waiting for GPU | ✅ expected — **S** later for potfile |
+| **B07** | BLUES after OINK | Hard reset on exit (old) | ✅ mitigated in 1.4.6 radio handoff |
+| **B08** | EVILPIG portal | Phone ignores portal (old) | ✅ fixed 1.4.1 |
+| **B09** | Experimental radio borrow | Broke STA | ✅ not shipped |
+| **B10** | ZOMBIE skin | Locked | ✅ intended — 3 night wolf bites |
+| **B11** | After WPA-SEC, XFER/heap | Heap looks 4–8 KB until OINK | ⚠️ known — **OINK bounce** still the real coalescer. Don’t expect XFER to feel like after OINK. |
+
+**Legend:** ⚠️ still a pig · ✅ fixed or intentional
+
+---
+
+## How to report a bug
+
+https://github.com/lexilexiko/OnePork/issues
+
+```text
+Version: v0.1.8c (1.6.5)
 Hardware: M5Cardputer (ADV? C5?)
 Steps:
   1. ...
@@ -168,26 +288,9 @@ After reboot: works / still broken
 Notes:
 ```
 
-**Do not** post live API keys, WPA-SEC keys, or pwncrack keys in public issues.
+**Do not** post live API keys.
 
-Upstream bugs that are pure M5PORKCHOP may also belong at  
-https://github.com/0ct0sec/M5PORKCHOP/issues — fan features here first.
-
----
-
-## SD card (fan paths)
-
-```text
-/m5porkchop/
-  handshakes/     .pcap / .22000
-  pwncrack/
-    key.txt           ← pwncrack API key
-    key.txt.imported  ← after first load (kept)
-    results / uploaded lists (firmware)
-  wpa-sec/          WPA-SEC key + potfile
-  wigle/            WiGLE credentials
-/ir/                custom IR packs (1RP0RK)
-```
+Upstream-only bugs: https://github.com/0ct0sec/M5PORKCHOP/issues
 
 ---
 
@@ -195,17 +298,20 @@ https://github.com/0ct0sec/M5PORKCHOP/issues — fan features here first.
 
 | File | Contents |
 |------|----------|
-| **This README** | Fan front door, 1.6 highlight, **bugs table**, how to report |
-| **[FAN.md](FAN.md)** | What appeared in the fan package (feature history) |
-| **[releases/RELEASE_NOTES_1.6.md](releases/RELEASE_NOTES_1.6.md)** | 1.6 flash + pwncrack + workarounds |
+| **This README** | Fan front door, **full capability map**, bugs, how to report |
+| **[FAN.md](FAN.md)** | What appeared in the fan package |
+| **[releases/RELEASE_NOTES_1.6.5.md](releases/RELEASE_NOTES_1.6.5.md)** | 1.6.5 flash + this fix |
 | **[releases/README.md](releases/README.md)** | Prebuilt binary pointer |
 
 ---
 
-## Greetz
+## Credits
 
-- **0ct0** — M5PORKCHOP  
-- M5Stack / Cardputer community  
-- Everyone who files a clear bug report  
+| Who | Role |
+|-----|------|
+| **0ct0** | Original M5PORKCHOP — **donate:** https://buymeacoffee.com/0ct0 |
+| **lexilexiko** | Fan packaging, scenes, toys, and this particular brand of chaos |
 
-*Oink responsibly.*
+Greetz: M5Stack / Cardputer people, anyone who files a clear issue.
+
+*Oink responsibly. This barn is a fanfic with a compiler.*
