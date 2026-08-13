@@ -104,7 +104,6 @@ public:
     static void init();
     static void start();
     static void stop();
-    static void releaseMemory();
     static void update();
     static bool isRunning() { return running; }
     
@@ -251,8 +250,4 @@ private:
     static uint16_t filteredCount;
     static uint64_t filteredCache[64];
     static uint8_t filteredCacheIndex;
-    
-    // new
-    static const uint8_t PENDING_HS_SLOTS = 6;
-    static const uint32_t EAPOL_RETRY_TIMEOUT = 500;
 };

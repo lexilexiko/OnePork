@@ -1207,12 +1207,4 @@ void exitCritical() {
     taskEXIT_CRITICAL(&vectorMux);
 }
 
-void setBusy(bool isBusy) {
-    busy.store(isBusy, std::memory_order_release);
-}
-
-bool isBusy() {
-    return busy.load(std::memory_order_acquire);
-}
-
 } // namespace NetworkRecon
