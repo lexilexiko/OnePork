@@ -1,0 +1,11 @@
+.pio/
+.vscode/
+.idea/
+.DS_Store
+*.o
+*.obj
+*.elf
+*.map
+build*.log
+*.log
+src/build_info.h

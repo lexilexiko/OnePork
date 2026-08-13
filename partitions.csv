@@ -1,0 +1,9 @@
+# 0n3Pork W3b C3 partition table
+# 4 MB flash. 1.5 MB app + 2.4 MB LittleFS for handshakes/potfiles.
+# Name,     Type, SubType,  Offset,   Size,    Flags
+# Arduino LittleFS.begin() looks up label "spiffs" (not the subtype).
+nvs,        data, nvs,      0x9000,   0x6000,
+phy_init,   data, phy,      0xf000,   0x1000,
+factory,    app,  factory,  0x10000,  0x180000,
+spiffs,     data, spiffs,   0x190000, 0x260000,
+coredump,   data, coredump, 0x3f0000, 0x10000,
