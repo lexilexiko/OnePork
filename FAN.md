@@ -49,6 +49,8 @@ Not a rewrite of the barn — **extra straw**:
 | PWNCRACK **S** / **T** | Park pig + Recon, brew heap **before** Wi-Fi (HASHES already did this) |
 | Loot **hide** | Recon stays parked — bounce HASHES ↔ PWNCRACK keeps the hole |
 | **FRESH** | Idle **Z** or SYSTEM → FRESH. Kill Recon / Wi-Fi / BLE, brew, radio asleep. Then **O**. |
+| **OINK HUNT** | Settings → RADIO: KEEP (old) or RETRY (reset tries each O) |
+| OINK bar | Right side shows the SSID currently being hit |
 | README | Full capability map + fan-mod disclaimer |
 
 Handshake capture is still **OINK**. Heap readout can swing 14–30 KB; that is largest-contiguous, not a second RAM chip.

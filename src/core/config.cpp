@@ -106,6 +106,9 @@ struct __attribute__((packed)) ConfigBlob {
     uint16_t c5ScanIntervalMs;
     uint8_t  c5UartTxPin;
     uint8_t  c5UartRxPin;
+
+    // Appended: old blobs memset-0 this → KEEP (classic OINK)
+    uint8_t  oinkRetryHunt;
 };
 
 static void populateBlob(ConfigBlob& b, const GPSConfig& gps, const WiFiConfig& wifi,
@@ -161,6 +164,7 @@ static void populateBlob(ConfigBlob& b, const GPSConfig& gps, const WiFiConfig& 
     b.c5ScanIntervalMs = c5.scanIntervalMs;
     b.c5UartTxPin      = c5.uartTxPin;
     b.c5UartRxPin      = c5.uartRxPin;
+    b.oinkRetryHunt    = wifi.oinkRetryHunt ? 1 : 0;
 }
 
 static bool writeBlobTo(fs::FS& fs, const char* path, const ConfigBlob& b) {
@@ -286,6 +290,8 @@ static void extractBlob(const ConfigBlob& b, GPSConfig& gps, WiFiConfig& wifi,
     c5.scanIntervalMs = b.c5ScanIntervalMs > 0 ? b.c5ScanIntervalMs : 30000;
     c5.uartTxPin      = b.c5UartTxPin > 0 ? b.c5UartTxPin : 2;
     c5.uartRxPin      = b.c5UartRxPin > 0 ? b.c5UartRxPin : 1;
+
+    wifi.oinkRetryHunt = b.oinkRetryHunt != 0;
 }
 
 static uint16_t clampU16(uint32_t value, uint16_t minVal, uint16_t maxVal) {
@@ -636,6 +642,7 @@ bool Config::applyJson(const JsonDocument& doc) {
         wifiConfig.lockTime = doc["wifi"]["lockTime"] | 12000;
         wifiConfig.enableDeauth = doc["wifi"]["enableDeauth"] | true;
         wifiConfig.randomizeMAC = doc["wifi"]["randomizeMAC"] | true;
+        wifiConfig.oinkRetryHunt = doc["wifi"]["oinkRetryHunt"] | false;
         int attackRssi = doc["wifi"]["attackMinRssi"] | -70;
         wifiConfig.attackMinRssi = clampI8(attackRssi, -90, -50);
         int minRssi = doc["wifi"]["spectrumMinRssi"] | -95;

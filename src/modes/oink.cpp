@@ -424,13 +424,9 @@ void OinkMode::init() {
     }
     
     // networks vector is now managed by NetworkRecon - just clear OINK-specific data
+    // No shrink_to_fit / reserve — same abort as HASHES on a fragmented heap.
     handshakes.clear();
-    handshakes.shrink_to_fit();
     pmkids.clear();
-    pmkids.shrink_to_fit();
-
-    handshakes.reserve(5);
-    pmkids.reserve(10);
     filteredCount = 0;
     memset(filteredCache, 0, sizeof(filteredCache));
     filteredCacheIndex = 0;
@@ -483,9 +479,22 @@ void OinkMode::start() {
     Serial.printf("[OINK] Starting... free=%u largest=%u\n",
                   ESP.getFreeHeap(), heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
     
-    // Ensure NetworkRecon is running (handles WiFi promiscuous mode)
-    if (!NetworkRecon::isRunning()) {
+    // Ensure NetworkRecon is sniffing. FRESH / loot hide park it; OINK wakes it.
+    if (NetworkRecon::isPaused()) {
+        NetworkRecon::resume();
+    } else if (!NetworkRecon::isRunning()) {
         NetworkRecon::start();
+    }
+
+    // RADIO → OINK HUNT = RETRY: reset timed-out tries. KEEP (default) leaves them.
+    // Never clear hasHandshake — already-saved captures stay skipped.
+    if (Config::wifi().oinkRetryHunt) {
+        NetworkRecon::enterCritical();
+        for (auto& n : networks()) {
+            n.attackAttempts = 0;
+            n.cooldownUntil = 0;
+        }
+        NetworkRecon::exitCritical();
     }
     
     // Initialize WSL bypasser for deauth frame injection
@@ -588,11 +597,9 @@ void OinkMode::stop() {
         }
     }
     
-    // FIX: Release vector capacity to recover heap (~6KB leak)
+    // Clear lists. Do not shrink_to_fit — abort() on fragmented heap (no exceptions).
     handshakes.clear();
-    handshakes.shrink_to_fit();
     pmkids.clear();
-    pmkids.shrink_to_fit();
     
     // Reset static pool tracking (no heap ops - pool is pre-allocated)
     for (int i = 0; i < PENDING_HS_SLOTS; i++) {
@@ -1138,6 +1145,10 @@ void OinkMode::update() {
                         sendAuthenticationRequest(targetBssid);
                         delay(10);  // AP processes auth in <2ms; 10ms is safe margin
                         sendAssociationRequest(targetBssid, targetSSID, strlen(targetSSID));
+                        strncpy(targetSSIDCache, targetSSID, sizeof(targetSSIDCache) - 1);
+                        targetSSIDCache[sizeof(targetSSIDCache) - 1] = '\0';
+                        targetHiddenCache = false;
+                        targetCacheValid = true;
                         Avatar::waveRipple(WaveMode::OUTGOING);
                         pmkidProbeTime = now;
                         if (pmkidTargetIndex < 64) pmkidProbedBitset |= (1ULL << pmkidTargetIndex);
@@ -2780,6 +2791,20 @@ uint16_t OinkMode::getCompleteHandshakeCount() {
 // LOCKING state queries for display
 bool OinkMode::isLocking() {
     return running && autoState == AutoState::LOCKING;
+}
+
+bool OinkMode::isHunting() {
+    if (!running) return false;
+    if (autoState == AutoState::LOCKING ||
+        autoState == AutoState::ATTACKING ||
+        autoState == AutoState::WAITING) {
+        return true;
+    }
+    if (autoState == AutoState::PMKID_HUNTING &&
+        targetCacheValid && targetSSIDCache[0] != '\0') {
+        return true;
+    }
+    return false;
 }
 
 const char* OinkMode::getTargetSSID() {

@@ -89,6 +89,8 @@ struct WiFiConfig {
     uint16_t lockTime = 12000;          // Time to discover clients before attacking (12s optimal, buffed 13s)
     bool enableDeauth = true;
     bool randomizeMAC = true;           // Randomize MAC on mode start for stealth
+    // OINK hunt: false=KEEP (classic, burned tries stay) true=RETRY (reset tries each O)
+    bool oinkRetryHunt = false;
     int8_t spectrumMinRssi = -95;       // Spectrum: minimum RSSI to render (dBm)
     int8_t attackMinRssi = -70;          // OINK/DNH: ignore networks weaker than this (dBm)
     uint8_t spectrumTopN = 0;           // Spectrum: cap visible APs (0 = no cap)

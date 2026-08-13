@@ -71,6 +71,8 @@ pio run -t upload -e m5cardputer
 | **PWNCRACK S/T brews heap first** | Same park+brew HASHES already used before WPA-SEC. Upload was dying at `LOW HEAP 4` because Recon still held ~19 KB. |
 | **Leave loot menus with Recon parked** | Hide no longer `start()`s Recon. Bounce HASHES ↔ PWNCRACK every minute keeps the hole. OINK / DNH / SPECTRUM start Recon themselves. |
 | **FRESH** (idle **Z** / SYSTEM) | Kill Recon + Wi-Fi + BLE, brew heap, radio asleep. Then **O** like after power-on. |
+| **OINK HUNT** (Settings → RADIO) | **KEEP** = classic (default). **RETRY** = each new O resets failed tries. Already-saved HS stay skipped. |
+| **OINK bottom bar** | Left: counts. Right: name of the AP being hit (or `[GHOST]`). |
 | Honest docs | This README is a **full capability map**, not just a 1.6 teaser |
 
 **Handshake / PMKID capture is still OINK.** This release does not rewrite sniff. If OINK caught it before, it still does.
@@ -142,7 +144,7 @@ ONEPORK
 | **M** | MICPORK | Mic spectrum toy (ADV codec). |
 | **E** | EVILPIG | SoftAP captive portal **lab** (authorized nets only). |
 | **S** | FLEXES | Lifetime XP / RANK / GR1ND. |
-| **T** | SETTINGS | Skins, Wi-Fi, GPS, C5, boot mode, sound… |
+| **T** | SETTINGS | Skins, Wi-Fi, GPS, C5, boot mode, sound… RADIO → **OINK HUNT**: KEEP (old) or RETRY (reset tries each O). |
 | **C** | CHARGING | Low-power charging screen. |
 | **Z** | FRESH | Kill Recon / Wi-Fi / BLE, brew heap. Like you just powered on. Then **O**. |
 | `` ` `` / ESC | back | Leave a mode → idle / menu. |

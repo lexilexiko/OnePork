@@ -51,6 +51,7 @@ enum SettingId : uint8_t {
     SET_LOCK_TIME,
     SET_DEAUTH,
     SET_RND_MAC,
+    SET_OINK_HUNT,
     SET_ATK_RSSI,
     SET_SPEC_RSSI,
     SET_SPEC_TOP,
@@ -185,6 +186,7 @@ static const EntryData kRadioEntries[] = {
     {SET_LOCK_TIME, "GL4SS ST4R3", SettingType::VALUE, 1000, 10000, 500, "MS", "HOW LONG YOU HOLD A TARGET"},
     {SET_DEAUTH, "DEAUTH", SettingType::TOGGLE, 0, 1, 1, "", "KICK CLIENTS OFF APS"},
     {SET_RND_MAC, "RND MAC", SettingType::TOGGLE, 0, 1, 1, "", "NEW MAC EACH MODE START"},
+    {SET_OINK_HUNT, "OINK HUNT", SettingType::VALUE, 0, 1, 1, "", "KEEP=OLD  RETRY=RESET TRIES EACH O"},
     {SET_ATK_RSSI, "ATK RSSI", SettingType::VALUE, -90, -50, 5, "DB", "SKIP WEAK NETS IN OINK/DNH"},
     {SET_SPEC_RSSI, "RSSI CUT", SettingType::VALUE, -95, -30, 5, "DB", "HIDE WEAK APS"},
     {SET_SPEC_TOP, "TOP APS", SettingType::VALUE, 0, 100, 5, "AP", "0 = NO CAP"},
@@ -310,6 +312,7 @@ static bool isConfigSetting(SettingId id) {
         case SET_LOCK_TIME:
         case SET_DEAUTH:
         case SET_RND_MAC:
+        case SET_OINK_HUNT:
         case SET_ATK_RSSI:
         case SET_SPEC_RSSI:
         case SET_SPEC_TOP:
@@ -700,6 +703,8 @@ static int getSettingValue(SettingId id) {
             return Config::wifi().enableDeauth ? 1 : 0;
         case SET_RND_MAC:
             return Config::wifi().randomizeMAC ? 1 : 0;
+        case SET_OINK_HUNT:
+            return Config::wifi().oinkRetryHunt ? 1 : 0;
         case SET_ATK_RSSI:
             return Config::wifi().attackMinRssi;
         case SET_SPEC_RSSI:
@@ -970,6 +975,12 @@ static bool setSettingValue(SettingId id, int value) {
             bool enabled = value != 0;
             if (Config::wifi().randomizeMAC == enabled) return false;
             Config::wifi().randomizeMAC = enabled;
+            return true;
+        }
+        case SET_OINK_HUNT: {
+            bool retry = value != 0;
+            if (Config::wifi().oinkRetryHunt == retry) return false;
+            Config::wifi().oinkRetryHunt = retry;
             return true;
         }
         case SET_ATK_RSSI: {
@@ -1857,6 +1868,10 @@ void SettingsMenu::draw(M5Canvas& canvas) {
                 const char* skinLabel = getPigSkinLabel(value);
                 if (selected && editing) snprintf(valBuf, sizeof(valBuf), "[%s]", skinLabel);
                 else { strncpy(valBuf, skinLabel, sizeof(valBuf) - 1); valBuf[sizeof(valBuf) - 1] = '\0'; }
+            } else if (entry.id == SET_OINK_HUNT) {
+                const char* huntLabel = (value != 0) ? "RETRY" : "KEEP";
+                if (selected && editing) snprintf(valBuf, sizeof(valBuf), "[%s]", huntLabel);
+                else { strncpy(valBuf, huntLabel, sizeof(valBuf) - 1); valBuf[sizeof(valBuf) - 1] = '\0'; }
             } else if (selected && editing) {
                 snprintf(valBuf, sizeof(valBuf), "[%d%s]", value, entry.suffix);
             } else {

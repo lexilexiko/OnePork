@@ -42,6 +42,13 @@ This is a **fan mod**. Extra scenes, toys, RANK theatre, and pwncrack glue are l
 
 Heap on screen may still read **30+** after a good brew and **14–19** after STA. That is fine. **Upload works. Handshake capture is still OINK.**
 
+### OINK hunt + bar (same version)
+
+- After a full barn, OINK going quiet is **KEEP** (default): already captured / 4-fail APs are skipped. Not a crash.
+- Settings → **RADIO** → **OINK HUNT** → **RETRY** if you want each new **O** to retry the ones that timed out. Saved handshakes stay skipped.
+- Bottom bar **right**: name of the network OINK is hitting now (`[GHOST]` if hidden).
+- OINK start wakes Recon after FRESH / loot hide. `shrink_to_fit` on OINK stop is gone (same abort as HASHES).
+
 ### Docs
 
 Main [README.md](../README.md) has a **full capability map** (every mode, cloud pipe, scene toy) plus an honest bug table.

@@ -1280,47 +1280,25 @@ void Display::drawBottomBar() {
     } else if (mode == PorkchopMode::SD_FORMAT) {
         statsStr = "ENTER=SELECT  BKSP=EXIT";
     } else if (mode == PorkchopMode::OINK_MODE) {
-        // OINK: show Networks, Handshakes, Deauths, Channel, and optionally BRO count
-        // PWNED banner is shown in top bar
-        // In LOCKING state, show target SSID and client discovery count
+        // Left: counts. Hunt SSID goes on the right (see below).
         uint16_t netCount = OinkMode::getNetworkCount();
         uint16_t hsCount = OinkMode::getCompleteHandshakeCount();
         uint32_t deauthCount = OinkMode::getDeauthCount();
         uint8_t channel = OinkMode::getChannel();
         uint16_t broCount = OinkMode::getExcludedCount();
         uint16_t filteredCount = OinkMode::getFilteredCount();
-        bool locking = OinkMode::isLocking();
         char buf[64];
-        
-        if (locking) {
-            // LOCKING state: show target and discovered clients
-            const char* targetSSID = OinkMode::getTargetSSID();
-            uint8_t clients = OinkMode::getTargetClientCount();
-            bool hidden = OinkMode::isTargetHidden();
-            
-            if (hidden || targetSSID[0] == '\0') {
-                // Hidden network - show [GHOST] label
-                snprintf(buf, sizeof(buf), "LOCK:[GHOST] C:%02d CH:%02d", clients, channel);
-            } else {
-                // Normal network - 18 chars now, proper sick innit
-                char ssidShort[19];
-                strncpy(ssidShort, targetSSID, 18);
-                ssidShort[18] = '\0';
-                // Uppercase for readability
-                for (int i = 0; ssidShort[i]; i++) ssidShort[i] = toupper(ssidShort[i]);
-                snprintf(buf, sizeof(buf), "LOCK:%s C:%02d CH:%02d", ssidShort, clients, channel);
-            }
+        if (OinkMode::isHunting()) {
+            snprintf(buf, sizeof(buf), "N:%03d HS:%02d D:%04lu CH:%02d",
+                     netCount, hsCount, deauthCount, channel);
+        } else if (broCount > 0 && filteredCount > 0) {
+            snprintf(buf, sizeof(buf), "N:%03d HS:%02d D:%04lu CH:%02d BRO:%02d F:%03d", netCount, hsCount, deauthCount, channel, broCount, filteredCount);
+        } else if (broCount > 0) {
+            snprintf(buf, sizeof(buf), "N:%03d HS:%02d D:%04lu CH:%02d BRO:%02d", netCount, hsCount, deauthCount, channel, broCount);
+        } else if (filteredCount > 0) {
+            snprintf(buf, sizeof(buf), "N:%03d HS:%02d D:%04lu CH:%02d F:%03d", netCount, hsCount, deauthCount, channel, filteredCount);
         } else {
-            // Attack mode: show D: counter
-            if (broCount > 0 && filteredCount > 0) {
-                snprintf(buf, sizeof(buf), "N:%03d HS:%02d D:%04lu CH:%02d BRO:%02d F:%03d", netCount, hsCount, deauthCount, channel, broCount, filteredCount);
-            } else if (broCount > 0) {
-                snprintf(buf, sizeof(buf), "N:%03d HS:%02d D:%04lu CH:%02d BRO:%02d", netCount, hsCount, deauthCount, channel, broCount);
-            } else if (filteredCount > 0) {
-                snprintf(buf, sizeof(buf), "N:%03d HS:%02d D:%04lu CH:%02d F:%03d", netCount, hsCount, deauthCount, channel, filteredCount);
-            } else {
-                snprintf(buf, sizeof(buf), "N:%03d HS:%02d D:%04lu CH:%02d", netCount, hsCount, deauthCount, channel);
-            }
+            snprintf(buf, sizeof(buf), "N:%03d HS:%02d D:%04lu CH:%02d", netCount, hsCount, deauthCount, channel);
         }
         strncpy(statsBuf, buf, sizeof(statsBuf) - 1);
         statsBuf[sizeof(statsBuf) - 1] = '\0';
@@ -1467,7 +1445,21 @@ void Display::drawBottomBar() {
     // Right: uptime or PIGSYNC channel
     bottomBar.setTextColor(TEXT_COL);
     bottomBar.setTextDatum(top_right);
-    if (mode == PorkchopMode::PIGSYNC_DEVICE_SELECT) {
+    if (mode == PorkchopMode::OINK_MODE && OinkMode::isHunting()) {
+        const char* targetSSID = OinkMode::getTargetSSID();
+        char name[14];
+        if (OinkMode::isTargetHidden() || !targetSSID || targetSSID[0] == '\0') {
+            strncpy(name, "[GHOST]", sizeof(name) - 1);
+            name[sizeof(name) - 1] = '\0';
+        } else {
+            strncpy(name, targetSSID, sizeof(name) - 1);
+            name[sizeof(name) - 1] = '\0';
+            for (int i = 0; name[i]; i++) {
+                if (name[i] >= 'a' && name[i] <= 'z') name[i] = (char)(name[i] - ('a' - 'A'));
+            }
+        }
+        bottomBar.drawString(name, DISPLAY_W - 2, 3);
+    } else if (mode == PorkchopMode::PIGSYNC_DEVICE_SELECT) {
         char chBuf[12];
         uint8_t ch = PigSyncMode::getDataChannel();
         snprintf(chBuf, sizeof(chBuf), "CH:%02d", ch);
