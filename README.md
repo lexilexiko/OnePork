@@ -68,10 +68,17 @@ pio run -t upload -e m5cardputer
 | **HASHES ↔ PWNCRACK no longer hard-reboots** | PWNCRACK used `vector::reserve` / `shrink_to_fit` on a fragmented heap. ESP32 has **no C++ exceptions** → `abort()` → reboot. HASHES already avoided this; PWNCRACK now matches. |
 | Cache clear without shrink | WPA-SEC / PWNCRACK caches `clear()` only |
 | Safer `NetworkRecon::freeNetworks()` | `shrink_to_fit` no longer runs inside a spinlock |
-| Honest docs | This README is now a **full capability map**, not just a 1.6 teaser |
+| **PWNCRACK S/T brews heap first** | Same park+brew HASHES already used before WPA-SEC. Upload was dying at `LOW HEAP 4` because Recon still held ~19 KB. |
+| **Leave loot menus with Recon parked** | Hide no longer `start()`s Recon. Bounce HASHES ↔ PWNCRACK every minute keeps the hole. OINK / DNH / SPECTRUM start Recon themselves. |
+| **FRESH** (idle **Z** / SYSTEM) | Kill Recon + Wi-Fi + BLE, brew heap, radio asleep. Then **O** like after power-on. |
+| Honest docs | This README is a **full capability map**, not just a 1.6 teaser |
+
+**Handshake / PMKID capture is still OINK.** This release does not rewrite sniff. If OINK caught it before, it still does.
 
 Older 1.6 work (pwncrack.org client, zombie skin) stays.  
 We did **not** ship the big WiFiService rewrite — it hurt heap/XFER/Blues on device.
+
+The **HEAP: nKB** number will swing (30+ after a good brew, 14–19 after STA). That is largest-contiguous, not “broken RAM”. Upload + OINK capture are the pass/fail.
 
 ---
 
@@ -112,6 +119,7 @@ ONEPORK
 │
 └── CORE
     ├── NetworkRecon / WiFiUtils
+    ├── FRESH (Z)        kill radio, brew, then O
     ├── SD / SDLayout / SDLog
     ├── Config / XP
     ├── GPS / JanusHog (C5)
@@ -136,6 +144,7 @@ ONEPORK
 | **S** | FLEXES | Lifetime XP / RANK / GR1ND. |
 | **T** | SETTINGS | Skins, Wi-Fi, GPS, C5, boot mode, sound… |
 | **C** | CHARGING | Low-power charging screen. |
+| **Z** | FRESH | Kill Recon / Wi-Fi / BLE, brew heap. Like you just powered on. Then **O**. |
 | `` ` `` / ESC | back | Leave a mode → idle / menu. |
 
 ### Menu map
@@ -147,7 +156,7 @@ ONEPORK
 | **LOOT** | HASHES (WPA-SEC), **PWNCRACK**, TRACKS (WiGLE), BOUNTY, PIGPASS |
 | **COMMS** | PIGSYNC, BACON, FILE XFER, JANUS HOG |
 | **RANK** | FLEXES, BADGES, UNLOCKABLES, FRUIT RUN, D3M4NDS |
-| **SYSTEM** | SETTINGS, BOAR BROS, FILES, COREDUMP, DIAG, SD FORMAT, CHARGING, ABOUT |
+| **SYSTEM** | SETTINGS, BOAR BROS, FILES, COREDUMP, DIAG, SD FORMAT, CHARGING, **FRESH**, ABOUT |
 
 ### Radio / capture
 
@@ -212,6 +221,7 @@ Skins: CLASSIC / BLUSH / HOG / **ZOMBIE** (unlock) / RETRO.
 | **FILES** | Browse / delete SD + SPIFFS. |
 | **SD FORMAT** | Nuclear option. Reboot after. |
 | **CHARGING** | Sleeps radio/GPS, dim screen. |
+| **FRESH** | Kill Recon + STA + BLE, brew the heap hole. Then press **O** like after boot. |
 | **COREDUMP / DIAG** | Crash log + heap snapshot. |
 | **BOAR BROS** | Networks you refuse to bully. |
 | **BOUNTY / BADGES / UNLOCK / D3M4NDS** | XP theatre. |
@@ -255,17 +265,17 @@ A failed big `vector::reserve` / `shrink_to_fit` → **hard reboot**. We documen
 
 | ID | Area | Symptom | 1.6.5 |
 |----|------|---------|--------|
-| **B01** | HASHES → PWNCRACK | Reboot when switching loot menus | **Fixed** — no more `reserve`/`shrink_to_fit` on that path |
+| **B01** | HASHES → PWNCRACK | Reboot when switching loot menus | **Fixed** — no `reserve`/`shrink_to_fit` |
 | **B02** | XFER → PWNCRACK | Reboot after file transfer | **Mitigated** same heap rule; still go easy after TLS |
-| **B03** | STA internet | S / XFER “no WiFi” | ⚠️ sometimes — check OTA SSID/pass; **OINK** 10–20s; **T** in PWNCRACK |
-| **B04** | After BLUES | Net flaky | ⚠️ known — OINK warm-up or reboot |
+| **B03** | STA internet | S / XFER “no WiFi” | ⚠️ sometimes — OTA SSID/pass; **OINK** 10–20s or **Z** then **O**; **T** in PWNCRACK |
+| **B04** | After BLUES | Net flaky | ⚠️ known — **Z** / **OINK** or reboot |
 | **B05** | PWN upload | UP=0 SKIP=N | ⚠️ user — **C** clear log → **S**; same key on site |
 | **B06** | PWN ST `[..]` | Waiting for GPU | ✅ expected — **S** later for potfile |
 | **B07** | BLUES after OINK | Hard reset on exit (old) | ✅ mitigated in 1.4.6 radio handoff |
 | **B08** | EVILPIG portal | Phone ignores portal (old) | ✅ fixed 1.4.1 |
 | **B09** | Experimental radio borrow | Broke STA | ✅ not shipped |
 | **B10** | ZOMBIE skin | Locked | ✅ intended — 3 night wolf bites |
-| **B11** | After WPA-SEC, XFER/heap | Heap looks 4–8 KB until OINK | ⚠️ known — **OINK bounce** still the real coalescer. Don’t expect XFER to feel like after OINK. |
+| **B11** | After WPA-SEC, XFER/heap | Heap 4 KB, PWN `LOW HEAP` | **Mitigated** — PWN S brews first; loot hide parks Recon; **Z** FRESH if you want a cold start. Number may still read 14–19 vs 30+. Upload + OINK capture are what count. |
 
 **Legend:** ⚠️ still a pig · ✅ fixed or intentional
 

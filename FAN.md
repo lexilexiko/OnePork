@@ -36,7 +36,7 @@ Not a rewrite of the barn — **extra straw**:
 
 ---
 
-## v1.6.5 — loot menu reboot
+## v1.6.5 — loot menu reboot + FRESH
 
 ### Appeared / fixed
 
@@ -46,7 +46,12 @@ Not a rewrite of the barn — **extra straw**:
 | PWNCRACK list | No `reserve` / `shrink_to_fit` (same rule HASHES already used) |
 | Cloud caches | `clear()` only |
 | `freeNetworks` | Shrink outside the Wi-Fi spinlock |
-| README | Full capability map + “this is a fanfic with a compiler” |
+| PWNCRACK **S** / **T** | Park pig + Recon, brew heap **before** Wi-Fi (HASHES already did this) |
+| Loot **hide** | Recon stays parked — bounce HASHES ↔ PWNCRACK keeps the hole |
+| **FRESH** | Idle **Z** or SYSTEM → FRESH. Kill Recon / Wi-Fi / BLE, brew, radio asleep. Then **O**. |
+| README | Full capability map + fan-mod disclaimer |
+
+Handshake capture is still **OINK**. Heap readout can swing 14–30 KB; that is largest-contiguous, not a second RAM chip.
 
 A larger WiFiService rewrite was **tried and reverted** — it ate heap and broke XFER/Blues. 1.6.5 stays surgical.
 

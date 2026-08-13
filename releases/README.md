@@ -16,7 +16,7 @@
 
 | File | Role |
 |------|------|
-| [RELEASE_NOTES_1.6.5.md](RELEASE_NOTES_1.6.5.md) | 1.6.5 HASHES↔PWNCRACK fix |
+| [RELEASE_NOTES_1.6.5.md](RELEASE_NOTES_1.6.5.md) | 1.6.5 reboot + heap bounce + FRESH |
 | [RELEASE_NOTES_1.6.md](RELEASE_NOTES_1.6.md) | Original 1.6 pwncrack notes |
 | [../README.md](../README.md) | Fan front door + **capability map** + bugs |
 | [../FAN.md](../FAN.md) | What appeared (fan changelog) |

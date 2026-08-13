@@ -229,13 +229,18 @@ void shutdown() {
 static uint32_t lastManualConditionMs = 0;
 
 size_t conditionHeapForTLS() {
-    // Enforce minimum cooldown between manual conditioning calls
+    // Cooldown only if we already have a TLS-sized hole. HASHES brew → PWNCRACK
+    // 2s later has largest ~4KB after Recon resume; skipping brew there is the
+    // "LOW HEAP 4" upload fail. Starve always brews; healthy heap stays cool.
     uint32_t now = millis();
+    size_t largestNow = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
     if (lastManualConditionMs != 0 &&
-        (now - lastManualConditionMs) < HeapPolicy::kConditionCooldownMinMs) {
-        Serial.printf("[HEAP] conditionHeapForTLS() skipped: cooldown (%us remaining)\n",
-                      (unsigned)((HeapPolicy::kConditionCooldownMinMs - (now - lastManualConditionMs)) / 1000));
-        return heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+        (now - lastManualConditionMs) < HeapPolicy::kConditionCooldownMinMs &&
+        largestNow >= HeapPolicy::kMinContigForTls) {
+        Serial.printf("[HEAP] conditionHeapForTLS() skipped: cooldown (%us remaining, largest=%u)\n",
+                      (unsigned)((HeapPolicy::kConditionCooldownMinMs - (now - lastManualConditionMs)) / 1000),
+                      (unsigned)largestNow);
+        return largestNow;
     }
     lastManualConditionMs = now;
 
@@ -493,6 +498,48 @@ size_t brewHeap(uint32_t dwellMs, bool includeBleCleanup) {
                   brewPacketCount);
     HeapHealth::resetPeaks(true);
     return finalLargest;
+}
+
+size_t coldStart() {
+    // Manual "I just turned it on" — no Recon hole, no leftover STA/BLE.
+    // brewHeap (not conditionHeapForTLS) so HASHES cooldown cannot skip us.
+    Serial.println("[HEAP] FRESH: killing Recon / WiFi / BLE");
+
+    if (NimBLEDevice::isInitialized()) {
+        NimBLEScan* pScan = NimBLEDevice::getScan();
+        if (pScan && pScan->isScanning()) {
+            pScan->stop();
+            delay(HeapPolicy::kBleStopDelayMs);
+        }
+        NimBLEAdvertising* pAdv = NimBLEDevice::getAdvertising();
+        if (pAdv && pAdv->isAdvertising()) {
+            pAdv->stop();
+            delay(HeapPolicy::kBleStopDelayMs);
+        }
+        NimBLEDevice::deinit(true);
+        delay(HeapPolicy::kBleDeinitDelayMs);
+    }
+
+    if (NetworkRecon::isRunning() || NetworkRecon::isPaused()) {
+        NetworkRecon::stop();
+        NetworkRecon::freeNetworks();
+    }
+    stopPromiscuous();
+    shutdown();
+
+    size_t after = brewHeap(HeapPolicy::kConditioningDwellMs, false);
+
+    stopPromiscuous();
+    shutdown();
+    if (NetworkRecon::isRunning() || NetworkRecon::isPaused()) {
+        NetworkRecon::stop();
+        NetworkRecon::freeNetworks();
+    }
+
+    size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    Serial.printf("[HEAP] FRESH done: largest=%u (brew=%u)\n",
+                  (unsigned)largest, (unsigned)after);
+    return largest;
 }
 
 }  // namespace WiFiUtils

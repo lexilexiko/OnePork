@@ -79,4 +79,11 @@ namespace WiFiUtils {
      * @return Size of largest contiguous block after brew
      */
     size_t brewHeap(uint32_t dwellMs = HeapPolicy::kBrewDefaultDwellMs, bool includeBleCleanup = false);
+
+    /**
+     * @brief Kill Recon / STA / BLE and brew heap — "just powered on", radio asleep.
+     * User then presses O for a classic OINK wake-up.
+     * @return Largest contiguous free block after the kill+brew
+     */
+    size_t coldStart();
 }

@@ -255,6 +255,16 @@ void Porkchop::init() {
             case 28: setMode(PorkchopMode::IR_PORK_MODE); break;
             case 29: Display::showChallenges(); break;  // RANK → D3M4NDS (session trials)
             case 30: setMode(PorkchopMode::PWNCRACK_MODE); break;
+            case 31: {
+                Display::showToast("FRESH: KILLING RADIO...", 1200);
+                Avatar::resumeScene();
+                size_t largest = WiFiUtils::coldStart();
+                char msg[32];
+                snprintf(msg, sizeof(msg), "FRESH %uKB  PRESS O",
+                         (unsigned)(largest / 1024));
+                Display::showToast(msg, 2500);
+                break;
+            }
         }
     });
 
@@ -1168,6 +1178,18 @@ void Porkchop::handleInput() {
         if (M5Cardputer.Keyboard.isKeyPressed('c') ||
             M5Cardputer.Keyboard.isKeyPressed('C')) {
             setMode(PorkchopMode::CHARGING);
+            return;
+        }
+        // Z — FRESH: kill Recon/WiFi/BLE, brew heap, stay idle. Then O.
+        if (M5Cardputer.Keyboard.isKeyPressed('z') ||
+            M5Cardputer.Keyboard.isKeyPressed('Z')) {
+            Display::showToast("FRESH: KILLING RADIO...", 1200);
+            Avatar::resumeScene();
+            size_t largest = WiFiUtils::coldStart();
+            char msg[32];
+            snprintf(msg, sizeof(msg), "FRESH %uKB  PRESS O",
+                     (unsigned)(largest / 1024));
+            Display::showToast(msg, 2500);
             return;
         }
         if (M5Cardputer.Keyboard.isKeyPressed('p') ||
