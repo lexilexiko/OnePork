@@ -78,7 +78,10 @@ If LittleFS fails to mount after a table change, erase then upload again.
 
 ### Prebuilt
 
-See **Releases** for `firmware.bin`. Flash with esptool / your usual ESP32-C3 tool. Erase flash if you were on an older partition layout.
+[**Download v0.3.0 firmware**](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.3.0/0n3Pork-W3b-v0.3.0-stampc3.bin)  
+Release page: https://github.com/lexilexiko/0n3Pork-W3b/releases/tag/w3b-v0.3.0
+
+Flash with esptool / your usual ESP32-C3 tool. Erase flash if you were on an older partition layout.
 
 ---
 
