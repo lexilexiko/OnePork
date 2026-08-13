@@ -197,6 +197,13 @@ User runs these and pastes output (text, not screenshot) for me to debug.
 
 ## 9. Build/compile error log
 
+- 2026-08-13 - Public brand is lexilexiko only. This Stamp C3 web box is
+  the user's own project. Do not put 0ct0 / M5PORKCHOP / OINK / donate
+  links on README, LICENSE, UI, or GitHub releases. Mascot is our
+  pixel pig (docs/pig.jpg, docs/pig-face.jpg, inline SVG in the web
+  header). Web UI uses the barn/pink palette. Cardputer cousin OnePork
+  may be linked; 0ct0 credits stay off this product.
+
 - 2026-08-13 - Aligned 22000 writer with OnePork/OINK (lexilexiko/OnePork):
   PMKID `WPA*01*...*ESSID***01` as `.22000`, handshake
   `WPA*02*...*00` as `_hs.22000`, PMKID KDE `dd 14 00 0f ac 04`,

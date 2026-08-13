@@ -17,7 +17,7 @@ First Stamp C3 web release.
 ## Highlights
 
 - Light capture (web) vs aggressive (GPIO3 button, hop + deauth)
-- `.pcap` + OINK-compatible `.22000` / `_hs.22000`
+- `.pcap` + hashcat `.22000` / `_hs.22000`
 - AP + STA (UI stays up during sync)
 - WPA-Sec + Pwncrack sync and potfile lists
 - AP name/password editable in the web UI

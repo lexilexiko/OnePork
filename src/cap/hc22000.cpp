@@ -87,7 +87,7 @@ static void maybeWrite(Hs* h) {
     hexEnc(h->sta, 6, sta);
     hexEnc(h->essid, h->essidLen, ess);
 
-    // Same line as OnePork OINK: WPA*01*PMKID*AP*STA*ESSID***01
+    // hashcat 22000 PMKID: WPA*01*PMKID*AP*STA*ESSID***01
     if (h->havePmkid && !h->wrotePmkid) {
         bool z = true;
         for (int i = 0; i < 16; i++) if (h->pmkid[i]) { z = false; break; }
@@ -100,7 +100,7 @@ static void maybeWrite(Hs* h) {
         }
     }
 
-    // Same line as OnePork OINK: WPA*02*MIC*AP*STA*ESSID*ANONCE*EAPOL*00 (M1+M2)
+    // hashcat 22000 EAPOL: WPA*02*MIC*AP*STA*ESSID*ANONCE*EAPOL*00 (M1+M2)
     if (h->haveAnonce && h->haveM2 && !h->wroteEapol && h->m2Len >= 97) {
         uint16_t eapolLen = (uint16_t)((h->m2[2] << 8) | h->m2[3]);
         eapolLen = (uint16_t)(eapolLen + 4);
@@ -152,8 +152,8 @@ static void parseBeacon(const uint8_t* f, uint16_t len) {
     }
 }
 
-static bool findPmkidOink(const uint8_t* payload, uint16_t len, uint8_t out[16]) {
-    // OnePork: descriptor 0x02, key data at 99, KDE dd 14 00 0f ac 04
+static bool findPmkidKde(const uint8_t* payload, uint16_t len, uint8_t out[16]) {
+    // EAPOL key descriptor 0x02, key data at 99, PMKID KDE dd 14 00 0f ac 04
     if (len < 121 || payload[4] != 0x02) return false;
     uint16_t keyDataLen = (uint16_t)((payload[97] << 8) | payload[98]);
     if (keyDataLen < 22 || len < 99 + keyDataLen) return false;
@@ -187,7 +187,7 @@ static void parseEapol(const uint8_t* f, uint16_t len) {
     if (total > elen) total = elen;
     if (total > MAX_EAPOL) total = MAX_EAPOL;
 
-    // OnePork: keyInfo at payload[5..6]
+    // keyInfo at EAPOL payload[5..6]
     uint16_t ki = (uint16_t)((e[5] << 8) | e[6]);
     uint8_t install = (uint8_t)((ki >> 6) & 1);
     uint8_t keyAck = (uint8_t)((ki >> 7) & 1);
@@ -220,7 +220,7 @@ static void parseEapol(const uint8_t* f, uint16_t len) {
         h->haveAnonce = true;
         s_lastM1Ms = millis();
         uint8_t pmk[16];
-        if (findPmkidOink(e, total, pmk)) {
+        if (findPmkidKde(e, total, pmk)) {
             memcpy(h->pmkid, pmk, 16);
             h->havePmkid = true;
         }

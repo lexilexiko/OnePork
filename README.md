@@ -1,22 +1,28 @@
 # 0n3Pork W3b
 
-Web-first handshake / PMKID pocket box for **M5Stamp C3** (ESP32-C3).  
-Fan sibling of [OnePork](https://github.com/lexilexiko/OnePork) (Cardputer). Capture logic follows **OINK** from [M5PORKCHOP](https://github.com/0ct0sec/M5PORKCHOP) by **0ct0**.
+<p align="center">
+  <img src="docs/pig.jpg" width="280" alt="0n3Pork pig">
+</p>
+
+<p align="center"><b>Your pocket pig.</b> Web UI on an M5Stamp C3.</p>
+
+Handshake / PMKID box with a browser instead of a screen.  
+Idea, firmware, and the pig: **lexilexiko**.
 
 | | |
 |---|---|
 | **Version** | **v0.3.0** |
-| **Hardware** | M5Stamp C3, 4 MB flash, USB-C |
-| **UI** | browser at `http://192.168.4.1` or `http://on3pork.local` |
+| **Hardware** | M5Stamp C3 · ESP32-C3 · 4 MB · USB-C |
+| **UI** | `http://192.168.4.1` · `http://on3pork.local` |
 | **Storage** | LittleFS (no SD card) |
 
 ```
-        ^__^
-        (oo)\_______
-        (__)\       )\/\
-            ||----w |
-            ||     ||
-   stamp-sized pig · web instead of a screen
+      ^..^
+     (oo  )
+    /  >  \~~
+   (_    _)
+     uu uu
+   stamp pig · web barn
 ```
 
 ---
@@ -33,7 +39,7 @@ Deauth / handshake capture can be illegal. You are responsible for how you use t
 1. **Capture** 802.11 EAPOL / PMKID
    - **Light** (web **START light**): same channel, UI stays up
    - **Aggressive** (onboard button GPIO3 only): hop 1–13, deauth seen BSSIDs, SSID becomes `0n3Pork AGG`
-2. Writes **`.pcap`** (WPA-Sec) and hashcat **`.22000` / `_hs.22000`** (Pwncrack / hashcat `-m 22000`)
+2. Writes **`.pcap`** (WPA-Sec) and hashcat **`.22000` / `_hs.22000`** (`-m 22000`)
 3. **AP + STA**: stay on `0n3Pork W3b` while the board joins home Wi-Fi or a cracked network
 4. **Sync**
    - [WPA-Sec](https://wpa-sec.stanev.org/) — upload pcap, download potfile
@@ -113,11 +119,14 @@ Flash with esptool / your usual ESP32-C3 tool. Erase flash if you were on an old
 src/
   main.cpp
   button/          GPIO3
-  cap/             sniffer, pcap, hc22000 (OINK-compatible lines)
+  cap/             sniffer, pcap, hashcat 22000
   net/             AP / AP+STA, NVS
   storage/         LittleFS
   sync/            wpa-sec, pwncrack
   web/             single-page UI
+docs/
+  pig.jpg          our pig
+  pig-face.jpg     face mark
 ```
 
 ---
@@ -126,7 +135,8 @@ src/
 
 | Who | Role |
 |---|---|
-| **0ct0** | Original [M5PORKCHOP](https://github.com/0ct0sec/M5PORKCHOP) / OINK capture. Donate: [buymeacoffee.com/0ct0](https://buymeacoffee.com/0ct0) |
-| **lexilexiko** | [OnePork](https://github.com/lexilexiko/OnePork) on Cardputer, and this Stamp C3 web port |
+| **lexilexiko** | Idea, firmware, web barn, the pig |
+
+Cardputer cousin: [OnePork](https://github.com/lexilexiko/OnePork).
 
 MIT. See `LICENSE`.
