@@ -1,5 +1,5 @@
 // net/ap_sta.h
-// AP, STA, or AP+STA (same radio / same channel on ESP32-C3).
+// AP, STA, or AP+STA (same radio / same channel).
 
 #pragma once
 

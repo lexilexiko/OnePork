@@ -7,6 +7,8 @@
 #include "../sync/wpasec.h"
 #include "../sync/pwncrack.h"
 #include "../sync/pot_parse.h"
+#include "../button/button.h"
+#include "../board/board.h"
 #include <WebServer.h>
 #include <ArduinoJson.h>
 #include <ESPmDNS.h>
@@ -89,9 +91,10 @@ static const char* INDEX_HTML =
 "      <circle cx=\"8.2\" cy=\"20.2\" r=\"1.6\" fill=\"#F98C9C\"/>\n"
 "      <circle cx=\"23.8\" cy=\"20.2\" r=\"1.6\" fill=\"#F98C9C\"/>\n"
 "    </svg>\n"
-"    <div><h1>0n3Pork W3b</h1><span class=\"tag\">stamp pig</span></div>\n"
+"    <div><h1>0n3Pork W3b</h1><span class=\"tag\">pocket pig</span></div>\n"
 "  </div>\n"
 "  <span class=\"pill\" id=\"ver\">v--</span>\n"
+"  <span class=\"pill\" id=\"chip\">chip</span>\n"
 "  <span class=\"pill\" id=\"heap\">heap ?</span>\n"
 "</header>\n"
 "<main>\n"
@@ -105,6 +108,7 @@ static const char* INDEX_HTML =
 "    <div class=\"row\"><span class=\"k\">RSSI / clients</span><span class=\"v\" id=\"m-rssi\">--</span></div>\n"
 "    <div class=\"row\"><span class=\"k\">Joined WiFi</span><span class=\"v\" id=\"m-sta\">--</span></div>\n"
 "    <div class=\"row\"><span class=\"k\">Share</span><span class=\"v\" id=\"m-share\">--</span></div>\n"
+"    <div class=\"row\"><span class=\"k\">Board</span><span class=\"v\" id=\"m-board\">--</span></div>\n"
 "    <label>This AP name</label>\n"
 "    <input id=\"ap-ssid\" placeholder=\"0n3Pork W3b\" autocomplete=\"off\">\n"
 "    <label>This AP password (min 8 chars)</label>\n"
@@ -129,7 +133,11 @@ static const char* INDEX_HTML =
 "    <div class=\"row\"><span class=\"k\">EAPOL / written</span><span class=\"v\" id=\"cap-cnt\">--</span></div>\n"
 "    <div class=\"row\"><span class=\"k\">Files in /handshakes/</span><span class=\"v\" id=\"cap-files\">--</span></div>\n"
 "    <button id=\"cap-btn\" onclick=\"toggleCapture()\">--</button>\n"
-"    <p class=\"hint\">Web START is light mode: this channel only, UI stays. Board button is aggressive: hops all channels, kicks nearby clients, SSID becomes 0n3Pork AGG. Stop aggressive with the same button, then reconnect to 0n3Pork W3b.</p>\n"
+"    <label>Aggressive button GPIO</label>\n"
+"    <input id=\"btn-gpio\" type=\"number\" min=\"0\" max=\"48\" placeholder=\"0\" autocomplete=\"off\">\n"
+"    <button class=\"alt\" onclick=\"saveBtn()\">Save button GPIO</button>\n"
+"    <p class=\"hint\" id=\"btn-hint\">Stamp C3 = 3. Most ESP32 / S3 BOOT = 0. C3 DevKit BOOT = 9.</p>\n"
+"    <p class=\"hint\">Web START is light: this channel only, UI stays. The GPIO you set is aggressive: hops 1-13, kicks nearby clients, SSID becomes 0n3Pork AGG. Press again to stop, then reconnect to 0n3Pork W3b.</p>\n"
 "    <h3 style=\"margin-top:12px;margin-bottom:8px;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em\">Handshake files</h3>\n"
 "    <table style=\"width:100%;font-size:12px;border-collapse:collapse\">\n"
 "    <thead><tr style=\"border-bottom:1px solid var(--b)\"><th style=\"text-align:left;padding:6px 0\">File</th><th style=\"text-align:right;padding:6px 0\">Size</th><th style=\"text-align:right;padding:6px 0\">Action</th></tr></thead>\n"
@@ -192,6 +200,7 @@ static const char* INDEX_HTML =
 "  try{\n"
 "    const s=await jget('/api/status');\n"
 "    $('ver').textContent=s.version;\n"
+"    if($('chip')) $('chip').textContent=s.chip||'chip';\n"
 "    $('heap').textContent='heap '+Math.round(s.freeHeap/1024)+'K';\n"
 "    var modeLbl=s.mode==='APSTA'?'AP+STA':(s.mode||'--');\n"
 "    $('m-mode').innerHTML='<span class=\"ok\">'+modeLbl+'</span>';\n"
@@ -208,6 +217,8 @@ static const char* INDEX_HTML =
 "    else if(s.mode==='APSTA'||s.mode==='STA') staLine+='  connecting';\n"
 "    $('m-sta').textContent=staLine;\n"
 "    $('m-share').innerHTML = s.mode==='APSTA'?(s.napt?'<span class=\"ok\">NAT on</span>':'<span class=\"warn\">AP+STA, no phone NAT</span>'):'off';\n"
+"    if($('m-board')) $('m-board').textContent=(s.board||'--')+' / GPIO'+(s.btnGpio!==undefined?s.btnGpio:'?');\n"
+"    if($('btn-gpio') && !$('btn-gpio').dataset.touched && s.btnGpio!==undefined) $('btn-gpio').value=s.btnGpio;\n"
 "    var cm=s.capMode||'off';\n"
 "    if(cm==='aggressive') $('cap-state').innerHTML='<span class=\"err\">aggressive</span>';\n"
 "    else if(cm==='light') $('cap-state').innerHTML='<span class=\"ok\">light</span>';\n"
@@ -233,6 +244,15 @@ static const char* INDEX_HTML =
 "      $('sync-log').textContent = s.sync.message + extra;\n"
 "    }\n"
 "  }catch(e){console.log(e);}\n"
+"}\n"
+"async function saveBtn(){\n"
+"  const g=parseInt($('btn-gpio').value,10);\n"
+"  if(isNaN(g)){alert('enter GPIO number');return;}\n"
+"  const r=await jpost('/api/button',{gpio:g});\n"
+"  $('btn-gpio').dataset.touched='';\n"
+"  if(r && r.ok===false) alert(r.error||'button save failed');\n"
+"  else alert('button GPIO '+g+' saved');\n"
+"  refresh();\n"
 "}\n"
 "async function saveAp(){\n"
 "  const ssid=$('ap-ssid').value.trim();\n"
@@ -362,7 +382,7 @@ static const char* INDEX_HTML =
 "  }catch(e){console.log(e);}\n"
 "}\n"
 "async function wipe(){ await jpost('/api/wipe'); refresh(); loadResults(); loadHandshakes(); }\n"
-"['ap-ssid','ap-pass','sta-ssid','sta-pass','key-wpasec','key-pwncrack'].forEach(id=>{\n"
+"['ap-ssid','ap-pass','sta-ssid','sta-pass','key-wpasec','key-pwncrack','btn-gpio'].forEach(id=>{\n"
 "  $(id).addEventListener('input',()=>{$(id).dataset.touched='1';});\n"
 "});\n"
 "refresh(); loadHandshakes(); loadResults();\n"
@@ -433,6 +453,11 @@ static void handleStatus() {
     doc["apClients"] = s.apClients;
     doc["freeHeap"] = ESP.getFreeHeap();
     doc["version"] = ON3PORK_VERSION;
+    doc["board"] = Board::name();
+    doc["chip"] = Board::chip();
+    doc["flash"] = Board::flashBytes();
+    doc["btnGpio"] = Button::pin();
+    doc["btnDefault"] = Button::defaultPin();
     doc["capture"] = Cap::isRunning();
     if (Cap::runMode() == Cap::RunMode::Aggressive) doc["capMode"] = "aggressive";
     else if (Cap::runMode() == Cap::RunMode::Light) doc["capMode"] = "light";
@@ -518,6 +543,23 @@ static void handleWifiAp() {
     bool ok = Net::setAp(ssid, pass, ch);
     if (ok) s_srv.send(200, "application/json", "{\"ok\":true}");
     else    s_srv.send(400, "application/json", "{\"ok\":false,\"error\":\"bad AP name or password (8+ chars)\"}");
+}
+
+static void handleButton() {
+    JsonDocument doc;
+    if (!parseJsonBody(doc)) {
+        s_srv.send(400, "application/json", "{\"ok\":false,\"error\":\"no body\"}");
+        return;
+    }
+    int gpio = doc["gpio"] | -1;
+    if (!Button::setPin(gpio)) {
+        s_srv.send(400, "application/json", "{\"ok\":false,\"error\":\"bad GPIO for this chip\"}");
+        return;
+    }
+    JsonDocument resp;
+    resp["ok"] = true;
+    resp["gpio"] = Button::pin();
+    sendJson(resp);
 }
 
 static void handleCaptureStart() {
@@ -868,6 +910,7 @@ void begin() {
     s_srv.on("/api/wifi/mode", HTTP_POST, handleWifiMode);
     s_srv.on("/api/wifi/sta", HTTP_POST, handleWifiSta);
     s_srv.on("/api/wifi/ap", HTTP_POST, handleWifiAp);
+    s_srv.on("/api/button", HTTP_POST, handleButton);
     s_srv.on("/api/capture/start", HTTP_POST, handleCaptureStart);
     s_srv.on("/api/capture/stop", HTTP_POST, handleCaptureStop);
     s_srv.on("/api/keys", HTTP_POST, handleKeys);

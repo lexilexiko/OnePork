@@ -9,6 +9,7 @@
 #include "web/web_server.h"
 #include "sync/sync_manager.h"
 #include "button/button.h"
+#include "board/board.h"
 
 void setup() {
     Serial.begin(115200);
@@ -16,6 +17,9 @@ void setup() {
     Serial.println();
     Serial.printf(">>> %s v%s build=%s\n", ON3PORK_NAME,
                   ON3PORK_VERSION, ON3PORK_BUILD);
+    Serial.printf("[BOOT] board=%s chip=%s flash=%uK\n",
+                  Board::name(), Board::chip(),
+                  (unsigned)(Board::flashBytes() / 1024));
 
     // 1. Filesystem
     if (!Storage::begin()) {

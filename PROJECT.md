@@ -197,6 +197,17 @@ User runs these and pastes output (text, not screenshot) for me to debug.
 
 ## 9. Build/compile error log
 
+- 2026-08-14 - S3 boot loop: image header said 8 MB, chip
+  probed 4 MB (`Detected size(4096k) smaller than ... 8192k`).
+  Default `esp32s3` / `esp32s3uart` now 4 MB + DIO. Optional
+  `esp32s3-8m` for N8. Erase before reflash (coredump CRC leftover).
+
+- 2026-08-14 - Multi-board v0.4.0. One source tree, separate PIO
+  envs: stampc3, esp32c3, esp32s3, esp32s3uart, esp32, esp32s2.
+  A C3 binary cannot run on S3. Button GPIO is NVS + web field
+  (default per env: Stamp C3=3, C3 DevKit=9, others=0). Board
+  name/chip shown in UI. Partition table stays 4 MB-safe.
+
 - 2026-08-13 - Public brand is lexilexiko only. This Stamp C3 web box is
   the user's own project. Do not put 0ct0 / M5PORKCHOP / OINK / donate
   links on README, LICENSE, UI, or GitHub releases. Mascot is our
