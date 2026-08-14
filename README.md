@@ -13,7 +13,7 @@ One tree of source. **One binary per chip** — a C3 `.bin` will not boot on an 
 
 | | |
 |---|---|
-| **Version** | **v0.4.1** |
+| **Version** | **v0.4.2** |
 | **Chips** | ESP32 · S2 · S3 · C3 (M5Stamp C3 included) |
 | **UI** | `http://192.168.4.1` · `http://on3pork.local` |
 | **Storage** | LittleFS (no SD card) |
@@ -72,6 +72,7 @@ Set **Aggressive button GPIO** in the web UI to match your board, then press tha
 | ESP32-C3 DevKit | `esp32c3` | GPIO **9** (BOOT) |
 | ESP32-S3 native USB | `esp32s3` | GPIO **0** |
 | ESP32-S3 UART / COM | `esp32s3uart` | GPIO **0** |
+| ESP32-S3 DevKit N8 (8 MB) | `esp32s3-8m` | GPIO **0** |
 | ESP32 WROOM / DevKit | `esp32` | GPIO **0** |
 | ESP32-S2 | `esp32s2` | GPIO **0** |
 
@@ -97,12 +98,17 @@ S3 default image is **4 MB + DIO**. That matches SuperMini / N4 modules. If you 
 
 ### Prebuilt
 
-Release: https://github.com/lexilexiko/0n3Pork-W3b/releases/tag/w3b-v0.4.1
+Release: https://github.com/lexilexiko/0n3Pork-W3b/releases/tag/w3b-v0.4.2
 
-- [Stamp C3](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.1/0n3Pork-W3b-v0.4.1-stampc3.bin)
-- [ESP32-S3 4 MB](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.1/0n3Pork-W3b-v0.4.1-esp32s3.bin)
+- [M5Stamp C3](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-stampc3.bin)
+- [ESP32-C3 DevKit](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-esp32c3.bin)
+- [ESP32-S3 USB 4 MB](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-esp32s3.bin)
+- [ESP32-S3 UART 4 MB](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-esp32s3uart.bin)
+- [ESP32-S3 N8 8 MB](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-esp32s3-8m.bin)
+- [ESP32 classic](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-esp32.bin)
+- [ESP32-S2](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-esp32s2.bin)
 
-That S3 file is **4 MB**. Do not use an 8 MB image on a 4 MB module. Other chips: build the env above.
+S3 USB/UART files are **4 MB**. Use the N8 file only on a real 8 MB DevKit.
 
 ---
 

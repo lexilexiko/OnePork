@@ -197,6 +197,9 @@ User runs these and pastes output (text, not screenshot) for me to debug.
 
 ## 9. Build/compile error log
 
+- 2026-08-14 - v0.4.2 ships a prebuilt .bin for every PIO env:
+  stampc3, esp32c3, esp32s3, esp32s3uart, esp32s3-8m, esp32, esp32s2.
+
 - 2026-08-14 - S3 boot loop: image header said 8 MB, chip
   probed 4 MB (`Detected size(4096k) smaller than ... 8192k`).
   Default `esp32s3` / `esp32s3uart` now 4 MB + DIO. Optional
