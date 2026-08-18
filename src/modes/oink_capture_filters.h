@@ -20,11 +20,9 @@ inline bool shouldMarkDeauthSuccessOnM1(bool stationIsOurs, bool stationIsUnicas
     return (!stationIsOurs) && stationIsUnicast;
 }
 
-inline bool shouldStoreHandshakeForStation(bool stationIsOurs) {
-    // Don't store probe-induced (station==our MAC) EAPOL frames as "handshakes".
-    // PMKID extraction happens separately and remains enabled.
-    return !stationIsOurs;
-}
+// shouldStoreHandshakeForStation removed — original M5PORKCHOP does not gate
+// handshake storage on station==ours (was eating real M2 from clients that
+// happened to match our random MAC or AP-replayed M1).
 
 enum class HandshakeCreateBlockReason : uint8_t {
     None = 0,

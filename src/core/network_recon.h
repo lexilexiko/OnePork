@@ -223,6 +223,21 @@ using NewNetworkCallback = void(*)(wifi_auth_mode_t authmode, bool isHidden,
 void setNewNetworkCallback(NewNetworkCallback callback);
 
 // ============================================================================
+// Busy Flag (cross-mode protection)
+// ============================================================================
+
+/**
+ * @brief Set the global busy flag (used to mark the main thread as busy
+ *        touching shared vectors so the promiscuous callback can back off).
+ */
+void setBusy(bool isBusy);
+
+/**
+ * @brief Read the current busy flag state.
+ */
+bool isBusy();
+
+// ============================================================================
 // External Network Injection (JanusHog / JANUS HOG)
 // ============================================================================
 

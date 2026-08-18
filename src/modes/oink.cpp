@@ -33,10 +33,9 @@
 // This ensures all modes (OINK, DoNoHam, Spectrum) use the SAME mutex for the shared networks vector
 
 // Simple flag to avoid concurrent access between promiscuous callback and main thread
-// NOTE: oinkBusy is now SECONDARY protection - spinlock is PRIMARY
+// NOTE: NetworkRecon::setBusy()/isBusy() is now SECONDARY protection - spinlock is PRIMARY
 // The promiscuous callback runs in WiFi task context (not true ISR), but still needs
 // synchronization to prevent race conditions on networks/handshakes vectors
-static std::atomic<bool> oinkBusy{false};
 
 // Cache our current STA MAC so we can treat EAPOL frames destined for us as PMKID probe traffic.
 // Populated in OinkMode::start() after NetworkRecon has set up WiFi (and optional MAC randomization).
@@ -114,26 +113,30 @@ struct PendingHandshakeFrame {
     bool hasPMKID;
 };
 
-// Circular buffer for pending handshake frames (4 slots to handle rapid EAPOL bursts)
+// Circular buffer for pending handshake frames (6 slots to handle rapid EAPOL bursts)
 // STATIC POOL: Pre-allocated to avoid malloc in WiFi callback context (heap fragmentation risk)
 // WARNING: Each PendingHandshakeFrame is ~3.3KB (contains 4x EAPOLFrame @ 822 bytes each)
-// Total static pool: 4 * 3.3KB = ~13KB permanently in .bss - reduces heap even when idle!
-static const uint8_t PENDING_HS_SLOTS = 4;
+// Total static pool: 6 * 3.3KB = ~19.8KB permanently in .bss - reduces heap even when idle!
+static const uint8_t PENDING_HS_SLOTS = 6;
 static PendingHandshakeFrame pendingHsPool[PENDING_HS_SLOTS];  // Static pool - no heap ops in callback
 // #region agent log
-// [DEBUG] H1: This static pool uses ~13KB of RAM - logged at compile time in .bss
+// [DEBUG] H1: This static pool uses ~19.8KB of RAM - logged at compile time in .bss
 // Size info logged in init() below
 // #endregion
-static PendingHandshakeFrame* pendingHandshakes[PENDING_HS_SLOTS] = {nullptr, nullptr, nullptr, nullptr};
+static PendingHandshakeFrame* pendingHandshakes[PENDING_HS_SLOTS] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
 static std::atomic<uint8_t> pendingHsWrite{0};
 static std::atomic<uint8_t> pendingHsRead{0};
 static std::atomic<bool> pendingHsBusy[PENDING_HS_SLOTS] = {
     ATOMIC_VAR_INIT(false),
     ATOMIC_VAR_INIT(false),
     ATOMIC_VAR_INIT(false),
+    ATOMIC_VAR_INIT(false),
+    ATOMIC_VAR_INIT(false),
     ATOMIC_VAR_INIT(false)
 };
 static std::atomic<bool> pendingHsAllocated[PENDING_HS_SLOTS] = {  // Track which pool slots are in use
+    ATOMIC_VAR_INIT(false),
+    ATOMIC_VAR_INIT(false),
     ATOMIC_VAR_INIT(false),
     ATOMIC_VAR_INIT(false),
     ATOMIC_VAR_INIT(false),
@@ -239,7 +242,7 @@ static const uint16_t EAPOL_KEYDATA_OFFSET = 99;  // Key Data field offset
 
 // Timing constants
 static const uint32_t DEAUTH_BURST_INTERVAL_MS = 180;  // Optimal deauth burst interval (prevents queue saturation)
-static const uint32_t DEAUTH_POST_M1_LISTEN_MS = 1200; // Pause deauth briefly after M1 to capture handshake
+static const uint32_t DEAUTH_POST_M1_LISTEN_MS = 2000; // Pause deauth briefly after M1 to capture handshake
 
 // Callback (WiFi task) sets this when target M1 is observed; main loop reads it.
 static std::atomic<uint32_t> deauthPauseUntilMs{0};
@@ -321,7 +324,7 @@ static uint32_t attackStartTime = 0;
 static const uint32_t SCAN_TIME = 5000;         // 5 sec initial scan
 // LOCK_TIME now uses FlexesScreen::getLockTime() for class buff support
 static const uint32_t ATTACK_TIMEOUT = 15000;   // 15 sec per target
-static const uint32_t WAIT_TIME = 4500;         // 4.5 sec between targets (allows late EAPOL M3/M4)
+static const uint32_t WAIT_TIME = 6000;         // 6 sec between targets (allows late EAPOL M3/M4)
 static const uint32_t BORED_RETRY_TIME = 30000; // 30 sec between retry scans when bored
 static const uint32_t BORED_THRESHOLD = 3;      // Failed target attempts before bored
 
@@ -390,7 +393,7 @@ void OinkMode::init() {
     // #endregion
     
     // Reset busy flag in case of abnormal stop
-    oinkBusy = false;
+    NetworkRecon::setBusy(false);
     
     // Reset deferred event system
     pendingNewNetwork = false;
@@ -424,9 +427,12 @@ void OinkMode::init() {
     }
     
     // networks vector is now managed by NetworkRecon - just clear OINK-specific data
-    // No shrink_to_fit / reserve — same abort as HASHES on a fragmented heap.
+    // shrink_to_fit avoided (abort on fragmented heap), but reserve() keeps capacity
+    // stable so push_back doesn't trigger exponential reallocs during long sessions.
     handshakes.clear();
     pmkids.clear();
+    handshakes.reserve(8);    // matches pre-fault heuristic from original
+    pmkids.reserve(16);
     filteredCount = 0;
     memset(filteredCache, 0, sizeof(filteredCache));
     filteredCacheIndex = 0;
@@ -598,8 +604,11 @@ void OinkMode::stop() {
     }
     
     // Clear lists. Do not shrink_to_fit — abort() on fragmented heap (no exceptions).
+    // But DO reserve to keep capacity bounded on next start() and avoid realloc churn.
     handshakes.clear();
     pmkids.clear();
+    handshakes.reserve(8);
+    pmkids.reserve(16);
     
     // Reset static pool tracking (no heap ops - pool is pre-allocated)
     for (int i = 0; i < PENDING_HS_SLOTS; i++) {
@@ -660,8 +669,8 @@ void OinkMode::update() {
     }
     
     // Guard access to networks/handshakes vectors from promiscuous callback
-    // NOTE: oinkBusy is secondary protection, spinlock is primary
-    oinkBusy = true;
+    // NOTE: NetworkRecon::isBusy() is secondary protection, spinlock is primary
+    NetworkRecon::setBusy(true);
     
     // ============ Process Deferred Events from Callback ============
     // These events were queued in promiscuous callback to avoid heap/String ops there
@@ -778,7 +787,7 @@ void OinkMode::update() {
         shouldAutoSave = true;
     }
     NetworkRecon::exitCritical();
-    // IMPORTANT: don't run autoSaveCheck() while oinkBusy is true.
+    // IMPORTANT: don't run autoSaveCheck() while NetworkRecon::isBusy() is true.
     // autoSaveCheck pauses promiscuous mode and does SD I/O, which can drop EAPOL frames.
     
     // Process pending handshake creation from circular buffer (callback queued, we do push_back here)
@@ -788,12 +797,20 @@ void OinkMode::update() {
         if (!pendingHandshakes[slot]) {
             break;  // Not allocated yet, wait for next cycle
         }
-        // CAS acquire: atomically set busy=true if currently false.
-        // Prevents concurrent access if the WiFi callback (core 1)
-        // is updating this slot's frame data at the same time.
+        // Spin briefly to acquire write lock (callback might be writing this slot).
+        // Match the bound used in the producer (~64 attempts). This is a generous
+        // ceiling — actual handoff is sub-millisecond.
+        int acquireSpins = 0;
         bool expected = false;
-        if (!pendingHsBusy[slot].compare_exchange_strong(expected, true)) {
-            break;  // Callback is writing to this slot, wait for next cycle
+        while (acquireSpins++ < 64 &&
+               !pendingHsBusy[slot].compare_exchange_strong(expected, true)) {
+            expected = false;
+        }
+        if (acquireSpins >= 64) {
+            // Callback may have died while holding the lock (impossible in practice,
+            // but we don't want to spinlock the main thread forever). Skip this slot,
+            // will retry next update() cycle. Don't advance read pointer.
+            break;
         }
         
         // Create or find handshake entry in main thread context
@@ -910,7 +927,7 @@ void OinkMode::update() {
     
     // RELEASE LOCK EARLY - state machine doesn't need exclusive vector access
     // This minimizes packet drop window from ~10ms to ~0.5ms
-    oinkBusy = false;
+    NetworkRecon::setBusy(false);
     
     // Periodic beacon data audit to prevent leaks (every 10s - Phase 3A fix)
     // Free beacon data from saved handshakes to reclaim heap
@@ -1097,8 +1114,8 @@ void OinkMode::update() {
                     char targetSSID[33] = {0};
                     uint8_t targetChannel = 0;
                     
-                    const bool wasBusy = oinkBusy;
-                    oinkBusy = true;
+                    const bool wasBusy = NetworkRecon::isBusy();
+                    NetworkRecon::setBusy(true);
                     NetworkRecon::enterCritical();
                     size_t netCount = networks().size();
                     if (netCount > 0) {
@@ -1134,7 +1151,7 @@ void OinkMode::update() {
                         }
                     }
                     NetworkRecon::exitCritical();
-                    oinkBusy = wasBusy;
+                    NetworkRecon::setBusy(wasBusy);
                     
                     if (foundTarget) {
                         // Always lock channel for PMKID probe (even if already on it)
@@ -1287,8 +1304,8 @@ void OinkMode::update() {
             // Rebind target index by BSSID snapshot (avoid stale index/races)
             DetectedNetwork targetCopy = {};
             int foundIdx = -1;
-            const bool wasBusy = oinkBusy;
-            oinkBusy = true;
+            const bool wasBusy = NetworkRecon::isBusy();
+            NetworkRecon::setBusy(true);
             NetworkRecon::enterCritical();
             for (int i = 0; i < (int)networks().size(); i++) {
                 if (memcmp(networks()[i].bssid, targetBssid, 6) == 0) {
@@ -1298,7 +1315,7 @@ void OinkMode::update() {
                 }
             }
             NetworkRecon::exitCritical();
-            oinkBusy = wasBusy;
+            NetworkRecon::setBusy(wasBusy);
 
             if (foundIdx < 0) {
                 autoState = AutoState::NEXT_TARGET;
@@ -1376,8 +1393,8 @@ void OinkMode::update() {
                 uint8_t clientCountLocal = 0;
                 uint8_t clientMacs[MAX_CLIENTS_PER_NETWORK][6] = {};
 
-                const bool wasBusy = oinkBusy.load(std::memory_order_relaxed);
-                oinkBusy.store(true, std::memory_order_relaxed);
+                const bool wasBusy = NetworkRecon::isBusy();
+                NetworkRecon::setBusy(true);
                 NetworkRecon::enterCritical();
                 for (int i = 0; i < (int)networks().size(); i++) {
                     if (memcmp(networks()[i].bssid, targetBssid, 6) == 0) {
@@ -1402,7 +1419,7 @@ void OinkMode::update() {
                     }
                 }
                 NetworkRecon::exitCritical();
-                oinkBusy.store(wasBusy, std::memory_order_relaxed);
+                NetworkRecon::setBusy(wasBusy);
 
                 if (!targetFound) {
                     autoState = AutoState::NEXT_TARGET;
@@ -1681,8 +1698,8 @@ void OinkMode::update() {
                     checkedForPendingHandshake = true;
                     hasPendingHandshake = false;
                     if (targetIndex >= 0 && targetIndex < (int)networks().size()) {
-                        const bool wasBusy2 = oinkBusy;
-                        oinkBusy = true;
+                        const bool wasBusy2 = NetworkRecon::isBusy();
+                        NetworkRecon::setBusy(true);
                         NetworkRecon::enterCritical();
                         for (const auto& hs : handshakes) {
                             if (memcmp(hs.bssid, networks()[targetIndex].bssid, 6) == 0 &&
@@ -1692,7 +1709,7 @@ void OinkMode::update() {
                             }
                         }
                         NetworkRecon::exitCritical();
-                        oinkBusy = wasBusy2;
+                        NetworkRecon::setBusy(wasBusy2);
                     }
                 }
 
@@ -1849,7 +1866,7 @@ void OinkMode::update() {
     // Emergency heap recovery - erase lowest-priority networks from back (O(1) per pop)
     // After sortNetworksByPriority, worst candidates are at the back.
     if (ESP.getFreeHeap() < HeapPolicy::kMinHeapForOinkNetworkAdd && networks().size() > 50) {
-        oinkBusy = true;
+        NetworkRecon::setBusy(true);
         NetworkRecon::enterCritical();
 
         int emergencyErased = 0;
@@ -1892,7 +1909,7 @@ void OinkMode::update() {
         }
 
         NetworkRecon::exitCritical();
-        oinkBusy = false;
+        NetworkRecon::setBusy(false);
     }
 
     // Run auto-save only when we're not in handshake/PMKID capture-critical states.
@@ -2047,7 +2064,7 @@ void OinkMode::promiscuousCallback(const wifi_promiscuous_pkt_t* pkt, wifi_promi
     // NetworkRecon already handles beacon/network tracking, so we focus on:
     // 1. Beacon capture for target AP (for PCAP)
     // 2. Data frame processing (EAPOL/handshake capture)
-    
+
     if (!pkt) return;
     if (!running) return;
 
@@ -2063,19 +2080,44 @@ void OinkMode::promiscuousCallback(const wifi_promiscuous_pkt_t* pkt, wifi_promi
     const uint8_t* payload = pkt->payload;
     uint8_t frameSubtype = (payload[0] >> 4) & 0x0F;
 
+    // ===== OINK_FIXES #6 diagnostics =====
+    static uint32_t eapolTotal = 0;
+    static uint32_t eapolProcessed = 0;
+    static uint32_t beaconTotal = 0;
+    static uint32_t beaconProcessed = 0;
+    static uint32_t beaconDroppedBusy = 0;
+    static uint32_t lastCbLog = 0;
+    uint32_t _nowCb = millis();
+    if (_nowCb - lastCbLog > 5000) {
+        Serial.printf("[OINK-CB] eapol tot=%lu proc=%lu | beacon tot=%lu proc=%lu drop/busy=%lu\n",
+            eapolTotal, eapolProcessed,
+            beaconTotal, beaconProcessed, beaconDroppedBusy);
+        eapolTotal = 0;
+        eapolProcessed = 0;
+        beaconTotal = 0;
+        beaconProcessed = 0;
+        beaconDroppedBusy = 0;
+        lastCbLog = _nowCb;
+    }
+    // ===== /diagnostics =====
+
     switch (type) {
         case WIFI_PKT_MGMT:
-            // Gate beacon processing behind oinkBusy — beacons are non-critical
-            if (oinkBusy) break;
-            if (frameSubtype == 0x08) {
+            if (frameSubtype == 0x08) { // Beacon
+                beaconTotal++;
+                if (NetworkRecon::isBusy()) { beaconDroppedBusy++; break; }
+                beaconProcessed++;
                 processBeacon(payload, len, rssi);
             }
+            // Note: Probe responses handled by NetworkRecon for SSID reveal
             break;
 
         case WIFI_PKT_DATA:
-            // EAPOL is time-critical (<30ms handshake window) — NEVER gate behind oinkBusy.
+            // EAPOL is time-critical (<30ms handshake window) — NEVER gate behind busy flag.
             // Thread safety is handled by spinlock in processDataFrame/processEAPOL
             // and CAS atomics in the pending handshake pool.
+            eapolTotal++;
+            eapolProcessed++;
             processDataFrame(payload, len, rssi);
             break;
 
@@ -2277,7 +2319,15 @@ void OinkMode::processEAPOL(const uint8_t* payload, uint16_t len,
     else if (!keyAck && keyMic && !secure) messageNum = 2;  // M2: has MIC, not secure (M4 is secure)
     else if (keyAck && keyMic && install) messageNum = 3;
     else if (!keyAck && keyMic && secure) messageNum = 4;
-    
+
+    // Fallback for WPA1 / non-standard frames where the main mapping yields messageNum == 0.
+    // WPA1 APs sometimes set Key Ack + Key MIC with no install/secure bits for M2,
+    // and Key Ack only with Secure bit set for M1 in retransmits.
+    if (messageNum == 0) {
+        if (keyAck && keyMic && !install && !secure) messageNum = 2;
+        else if (keyAck && !keyMic && secure) messageNum = 1;
+    }
+
     if (messageNum == 0) return;
 
     // Determine which is AP (sender of M1/M3) and station
@@ -2426,12 +2476,9 @@ void OinkMode::processEAPOL(const uint8_t* payload, uint16_t len,
         }
     }
 
-    // Treat EAPOL where station == our STA MAC as probe traffic: keep PMKID extraction above,
-    // but do not create/store handshake records (avoids burning handshake slots and deauth-success false positives).
-    if (!OinkCaptureFilters::shouldStoreHandshakeForStation(stationIsOurs)) {
-        return;
-    }
-    
+    // Match original: filter dropped (station==ours was eating legitimate M2/M3/M4).
+    // PMKID extraction above still keys off descriptor type 0x02 only.
+
     // Find or create handshake entry (lookup only - no push_back)
     int hsIdx = findOrCreateHandshake(bssid, station);
     
@@ -2448,11 +2495,12 @@ void OinkMode::processEAPOL(const uint8_t* payload, uint16_t len,
         CapturedHandshake& hs = handshakes[hsIdx];
 
         // Store this frame (EAPOL payload for hashcat 22000)
-        // Guard: don't overwrite an already-captured frame — retransmissions
-        // may carry a different ANonce/SNonce, producing nonce mismatch that
-        // makes the .22000/.pcap uncrackable.
+        // Save the frame when we don't have it yet, OR when the new frame has
+        // better (less negative / closer to zero) RSSI than what we stored.
+        // Retransmissions may carry a different ANonce/SNonce; a stronger-signal
+        // retransmit is more likely to be near the cracking station.
         uint8_t frameIdx = messageNum - 1;
-        if (hs.frames[frameIdx].len == 0) {
+        if (hs.frames[frameIdx].len == 0 || hs.frames[frameIdx].rssi < rssi) {
             uint16_t copyLen = min((uint16_t)512, len);
             memcpy(hs.frames[frameIdx].data, payload, copyLen);
             hs.frames[frameIdx].len = copyLen;
@@ -2549,19 +2597,22 @@ void OinkMode::processEAPOL(const uint8_t* payload, uint16_t len,
                 // Write the first frame before publishing write pointer.
                 // This prevents consumer from seeing/consuming an empty slot.
                 if (frameIdx < 4) {
-                    // EAPOL payload for hashcat 22000
-                    uint16_t copyLen = min((uint16_t)512, len);
-                    memcpy(pendingHandshakes[targetSlot]->frames[frameIdx].data, payload, copyLen);
-                    pendingHandshakes[targetSlot]->frames[frameIdx].len = copyLen;
+                    // Empty slot — always store first frame.
+                    if (pendingHandshakes[targetSlot]->frames[frameIdx].len == 0) {
+                        // EAPOL payload for hashcat 22000
+                        uint16_t copyLen = min((uint16_t)512, len);
+                        memcpy(pendingHandshakes[targetSlot]->frames[frameIdx].data, payload, copyLen);
+                        pendingHandshakes[targetSlot]->frames[frameIdx].len = copyLen;
 
-                    // Full 802.11 frame for PCAP export
-                    uint16_t fullCopyLen = min((uint16_t)300, fullFrameLen);
-                    memcpy(pendingHandshakes[targetSlot]->frames[frameIdx].fullFrame, fullFrame, fullCopyLen);
-                    pendingHandshakes[targetSlot]->frames[frameIdx].fullFrameLen = fullCopyLen;
-                    pendingHandshakes[targetSlot]->frames[frameIdx].rssi = rssi;
+                        // Full 802.11 frame for PCAP export
+                        uint16_t fullCopyLen = min((uint16_t)300, fullFrameLen);
+                        memcpy(pendingHandshakes[targetSlot]->frames[frameIdx].fullFrame, fullFrame, fullCopyLen);
+                        pendingHandshakes[targetSlot]->frames[frameIdx].fullFrameLen = fullCopyLen;
+                        pendingHandshakes[targetSlot]->frames[frameIdx].rssi = rssi;
 
-                    pendingHandshakes[targetSlot]->capturedMask |= (1 << frameIdx);
-                    frameWrittenInAlloc = true;
+                        pendingHandshakes[targetSlot]->capturedMask |= (1 << frameIdx);
+                        frameWrittenInAlloc = true;
+                    }
                 }
                 
                 // Advance write pointer
@@ -2572,28 +2623,47 @@ void OinkMode::processEAPOL(const uint8_t* payload, uint16_t len,
             // else: buffer full, drop this frame (extremely rare with 4 slots)
         }
         
-        // Store frame in target slot if we have one.
-        // CAS acquire: prevents concurrent access with consumer (main loop, core 0).
-        // If CAS fails (consumer is reading this slot), drop the frame —
-        // EAPOL handshakes are retransmitted so we'll catch the next one.
+        // Store frame in target slot.
+        // Match original: if slot is currently busy (main thread reading), just exit
+        // the callback frame processing for *this* EAPOL — DON'T drop from the slot.
+        // Next callback (next EAPOL retransmit) will retry the write. M2/M3/M4 arrive
+        // 100-500ms after M1, so missing one retransmit is harmless; M2 arriving during
+        // main-thread handoff is FATAL if dropped (handshake becomes incomplete).
+        //
+        // For updates to existing slots, use a short spinlock bounded by pendingHsBusy CAS
+        // to avoid dropping validated handshake frames.
         if (!frameWrittenInAlloc && targetSlot < PENDING_HS_SLOTS && pendingHandshakes[targetSlot]) {
+            // For existing slots: spin briefly waiting for busy=false.
+            // EAPOL burst is 4 frames within ~10ms — main thread processing
+            // takes <1ms, so 64 spins (~tens of µs) is plenty.
+            int spins = 0;
             bool expected = false;
-            if (pendingHsBusy[targetSlot].compare_exchange_strong(expected, true)) {
+            while (spins++ < 64 && !pendingHsBusy[targetSlot].compare_exchange_strong(expected, true)) {
+                expected = false;
+            }
+            if (spins < 65) {
                 if (frameIdx < 4) {
-                    // EAPOL payload for hashcat 22000
-                    uint16_t copyLen = min((uint16_t)512, len);
-                    memcpy(pendingHandshakes[targetSlot]->frames[frameIdx].data, payload, copyLen);
-                    pendingHandshakes[targetSlot]->frames[frameIdx].len = copyLen;
+                    PendingHandshakeFrame* slot = pendingHandshakes[targetSlot];
+                    if (slot->frames[frameIdx].len == 0 || slot->frames[frameIdx].rssi < rssi) {
+                        uint16_t copyLen = min((uint16_t)512, len);
+                        memcpy(slot->frames[frameIdx].data, payload, copyLen);
+                        slot->frames[frameIdx].len = copyLen;
 
-                    // Full 802.11 frame for PCAP export
-                    uint16_t fullCopyLen = min((uint16_t)300, fullFrameLen);
-                    memcpy(pendingHandshakes[targetSlot]->frames[frameIdx].fullFrame, fullFrame, fullCopyLen);
-                    pendingHandshakes[targetSlot]->frames[frameIdx].fullFrameLen = fullCopyLen;
-                    pendingHandshakes[targetSlot]->frames[frameIdx].rssi = rssi;
+                        uint16_t fullCopyLen = min((uint16_t)300, fullFrameLen);
+                        memcpy(slot->frames[frameIdx].fullFrame, fullFrame, fullCopyLen);
+                        slot->frames[frameIdx].fullFrameLen = fullCopyLen;
+                        slot->frames[frameIdx].rssi = rssi;
 
-                    pendingHandshakes[targetSlot]->capturedMask |= (1 << frameIdx);
+                        slot->capturedMask |= (1 << frameIdx);
+                    }
                 }
-                pendingHsBusy[targetSlot].store(false);  // Release CAS lock
+                pendingHsBusy[targetSlot].store(false, std::memory_order_release);
+            } else {
+                // Spin timeout — count for diagnostics if instrumentation enabled.
+                #ifdef OINK_HAS_CB_STATS
+                extern volatile uint32_t eapolDroppedSpin;
+                eapolDroppedSpin++;
+                #endif
             }
         }
     }
@@ -3631,8 +3701,8 @@ bool OinkMode::hasHandshakeFor(const uint8_t* bssid) {
 }
 
 void OinkMode::updateTargetCache() {
-    bool wasBusy = oinkBusy;
-    oinkBusy = true;
+    bool wasBusy = NetworkRecon::isBusy();
+    NetworkRecon::setBusy(true);
 
     NetworkRecon::enterCritical();
     if (targetIndex >= 0 && targetIndex < (int)networks().size()) {
@@ -3652,7 +3722,7 @@ void OinkMode::updateTargetCache() {
     }
     NetworkRecon::exitCritical();
 
-    oinkBusy = wasBusy;
+    NetworkRecon::setBusy(wasBusy);
 }
 
 void OinkMode::sortNetworksByPriority() {
@@ -3663,8 +3733,8 @@ void OinkMode::sortNetworksByPriority() {
     // 4. Networks with handshake already (skip)
     // 5. PMF protected (can't attack)
 
-    bool wasBusy = oinkBusy;
-    oinkBusy = true;
+    bool wasBusy = NetworkRecon::isBusy();
+    NetworkRecon::setBusy(true);
 
     uint32_t now = millis();
 
@@ -3708,7 +3778,7 @@ void OinkMode::sortNetworksByPriority() {
     }
     NetworkRecon::exitCritical();
 
-    oinkBusy = wasBusy;
+    NetworkRecon::setBusy(wasBusy);
     updateTargetCache();
 }
 
