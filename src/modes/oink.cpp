@@ -427,6 +427,8 @@ void OinkMode::init() {
     // stable so push_back doesn't trigger exponential reallocs during long sessions.
     handshakes.clear();
     pmkids.clear();
+    handshakes.reserve(8);    // matches pre-fault heuristic from original
+    pmkids.reserve(16);
     filteredCount = 0;
     memset(filteredCache, 0, sizeof(filteredCache));
     filteredCacheIndex = 0;
@@ -601,6 +603,8 @@ void OinkMode::stop() {
     // But DO reserve to keep capacity bounded on next start() and avoid realloc churn.
     handshakes.clear();
     pmkids.clear();
+    handshakes.reserve(8);
+    pmkids.reserve(16);
     
     // Reset static pool tracking (no heap ops - pool is pre-allocated)
     for (int i = 0; i < PENDING_HS_SLOTS; i++) {
