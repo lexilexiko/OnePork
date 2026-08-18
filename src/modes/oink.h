@@ -104,6 +104,7 @@ public:
     static void init();
     static void start();
     static void stop();
+    static void releaseMemory();
     static void update();
     static bool isRunning() { return running; }
     

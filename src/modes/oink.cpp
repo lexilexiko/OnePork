@@ -117,26 +117,22 @@ struct PendingHandshakeFrame {
 // STATIC POOL: Pre-allocated to avoid malloc in WiFi callback context (heap fragmentation risk)
 // WARNING: Each PendingHandshakeFrame is ~3.3KB (contains 4x EAPOLFrame @ 822 bytes each)
 // Total static pool: 6 * 3.3KB = ~19.8KB permanently in .bss - reduces heap even when idle!
-static const uint8_t PENDING_HS_SLOTS = 6;
+static const uint8_t PENDING_HS_SLOTS = 4;
 static PendingHandshakeFrame pendingHsPool[PENDING_HS_SLOTS];  // Static pool - no heap ops in callback
 // #region agent log
-// [DEBUG] H1: This static pool uses ~19.8KB of RAM - logged at compile time in .bss
+// [DEBUG] H1: This static pool uses ~13KB of RAM - logged at compile time in .bss
 // Size info logged in init() below
 // #endregion
-static PendingHandshakeFrame* pendingHandshakes[PENDING_HS_SLOTS] = {nullptr, nullptr, nullptr, nullptr, nullptr, nullptr};
+static PendingHandshakeFrame* pendingHandshakes[PENDING_HS_SLOTS] = {nullptr, nullptr, nullptr, nullptr};
 static std::atomic<uint8_t> pendingHsWrite{0};
 static std::atomic<uint8_t> pendingHsRead{0};
 static std::atomic<bool> pendingHsBusy[PENDING_HS_SLOTS] = {
     ATOMIC_VAR_INIT(false),
     ATOMIC_VAR_INIT(false),
     ATOMIC_VAR_INIT(false),
-    ATOMIC_VAR_INIT(false),
-    ATOMIC_VAR_INIT(false),
     ATOMIC_VAR_INIT(false)
 };
 static std::atomic<bool> pendingHsAllocated[PENDING_HS_SLOTS] = {  // Track which pool slots are in use
-    ATOMIC_VAR_INIT(false),
-    ATOMIC_VAR_INIT(false),
     ATOMIC_VAR_INIT(false),
     ATOMIC_VAR_INIT(false),
     ATOMIC_VAR_INIT(false),
