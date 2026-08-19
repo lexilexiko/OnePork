@@ -73,6 +73,7 @@ A heap-park of NetworkRecon on HASHES/PWNCRACK hide had killed handshake catch. 
 | **OINK HUNT** | Settings → RADIO: **KEEP** (default, original) or **RETRY** |
 | **OINK bar** | Right: SSID being hit (`[GHOST]` if hidden) |
 | HASHES ↔ PWNCRACK no reboot | Still from 1.6.5 (`reserve`/`shrink` crash) |
+| Heap | **Enough for now.** Safer reclaim is still in progress — we will not auto-kill Recon again. |
 
 ---
 

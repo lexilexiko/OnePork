@@ -32,6 +32,11 @@ This is a **fan mod**. Extra scenes, toys, RANK theatre, and pwncrack glue are l
 - Settings → RADIO → **OINK HUNT**: KEEP (default) / RETRY
 - Bottom bar right: SSID OINK is hitting (`[GHOST]` if hidden)
 
-Heap after a heavy TLS session can still look 14–19 KB. That is largest-contiguous. For upload: **Z** then **S**. Do not auto-kill Recon on every loot exit.
+### Heap — work in progress
+
+Auto-parking Recon to free ~19 KB **broke handshake catch**. That path is **off**.
+
+Right now heap is **enough** for hunt + upload on the device we test.  
+We are **still working** on a safer way to reclaim RAM without killing the radio. Until then: hunt with Recon on; if TLS is tight, **Z** then **S**, then **O**.
 
 See [RELEASE_NOTES_1.6.5.md](RELEASE_NOTES_1.6.5.md) for the 1.6.5 write-up.
