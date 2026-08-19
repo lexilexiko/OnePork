@@ -38,7 +38,6 @@ struct PwnFileMeta {
 
 enum class PwnSyncState : uint8_t {
     IDLE,
-    PREPARING,          // park pig/Recon + brew heap (same as HASHES)
     CONNECTING_WIFI,
     UPLOADING,
     RUNNING_DIAG,
@@ -88,8 +87,6 @@ private:
     static void refreshSelected();
     static void startSync();
     static void startDiag();
-    static void prepareHeapForCloud();
-    static void restoreAfterCloud();
     static void processSyncState();
     static void drawSyncModal(M5Canvas& canvas);
     static void drawDetailView(M5Canvas& canvas);

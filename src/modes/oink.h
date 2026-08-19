@@ -149,9 +149,9 @@ public:
     static uint16_t getNetworkCount() { return NetworkRecon::getNetworkCount(); }
     static uint16_t getFilteredCount();
     
-    // LOCKING / hunt state info (for display)
+    // LOCKING state info (for display)
     static bool isLocking();
-    static bool isHunting();  // locking / attacking / waiting / pmkid probe
+    static bool isHunting();
     static const char* getTargetSSID();
     static uint8_t getTargetClientCount();
     static const uint8_t* getTargetBSSID();

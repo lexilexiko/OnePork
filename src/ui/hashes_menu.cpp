@@ -16,7 +16,6 @@
 #include "../core/sd_layout.h"
 #include "../core/wifi_utils.h"
 #include "../core/heap_health.h"
-#include "../core/heap_policy.h"
 #include "../piglet/avatar.h"   // Avatar::suspendScene/resumeScene in startSync()/hide()
 #include "../core/network_recon.h"
 #include <esp_heap_caps.h>
@@ -161,18 +160,11 @@ void HashesMenu::show() {
 void HashesMenu::hide() {
     active = false;
 
+    // Restore subsystems that may have been parked by startSync() and not yet resumed
     Avatar::resumeScene();
-    // Same as PWNCRACK hide: do not resume Recon. HASHES→PWNCRACK every
-    // minute would otherwise hand the next menu a 4KB hole.
-    if (NetworkRecon::isRunning() || NetworkRecon::isPaused()) {
-        Serial.println("[HASHES] Parking NetworkRecon on hide");
-        NetworkRecon::stop();
-        NetworkRecon::freeNetworks();
-    }
-    size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-    if (largest < HeapPolicy::kMinContigForTls) {
-        Serial.printf("[HASHES] hide brew (largest=%u)\n", (unsigned)largest);
-        WiFiUtils::conditionHeapForTLS();
+    if (NetworkRecon::isPaused()) {
+        Serial.println("[HASHES] Resuming NetworkRecon on hide");
+        NetworkRecon::resume();
     }
 
     // FIX: Always call emergencyCleanup first - ensures file handles closed
@@ -208,10 +200,10 @@ void HashesMenu::emergencyCleanup() {
     // No shrink_to_fit — same fragmentation risk as hide()
     WPASec::freeCacheMemory();
 
+    // Restore scene so the pig stays visible after emergency cleanup
     Avatar::resumeScene();
-    if (NetworkRecon::isRunning() || NetworkRecon::isPaused()) {
-        NetworkRecon::stop();
-        NetworkRecon::freeNetworks();
+    if (NetworkRecon::isPaused()) {
+        NetworkRecon::resume();
     }
 
     // Stop any in-progress operations
@@ -1393,8 +1385,12 @@ void HashesMenu::cancelSync() {
     syncModalActive = false;
     syncState = SyncState::IDLE;
 
+    // Restore subsystems parked in startSync() — safe to call even if not parked
+    // (Avatar::resumeScene tracks its own suspend count).
     Avatar::resumeScene();
-    // Keep Recon parked so a cancel → PWNCRACK bounce still has a hole.
+    if (NetworkRecon::isPaused()) {
+        NetworkRecon::resume();
+    }
 
     // Rescan captures
     scanCaptures();

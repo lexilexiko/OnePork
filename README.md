@@ -5,7 +5,7 @@ Recommended: **Cardputer ADV**.
 
 | | |
 |--|--|
-| **Version** | **v0.1.8c (1.6.5)** |
+| **Version** | **v0.1.8c (1.6.5.5)** |
 | **Upstream base** | M5PORKCHOP **0.1.8c** |
 | **This repo** | https://github.com/lexilexiko/OnePork |
 | **Upstream** | https://github.com/0ct0sec/M5PORKCHOP |
@@ -47,10 +47,10 @@ A **pocket lab** on a Cardputer: Wi-Fi recon, handshake/PMKID capture, GPS wardr
 ## Quick flash (no build)
 
 1. Download:  
-   [`releases/OnePork_v0.1.8c-1.6.5_m5cardputer_firmware.bin`](releases/OnePork_v0.1.8c-1.6.5_m5cardputer_firmware.bin)
+   [`releases/OnePork_v0.1.8c-1.6.5.5_m5cardputer_firmware.bin`](releases/OnePork_v0.1.8c-1.6.5.5_m5cardputer_firmware.bin)
 2. Flash with **M5 Launcher** (keeps XP/NVS) or M5Burner / esptool  
 3. Reboot. Default boot still warms radio with **OINK ~5s** unless you change Settings → BOOT MODE *and* the firmware honors IDLE.  
-4. Notes: [`releases/RELEASE_NOTES_1.6.5.md`](releases/RELEASE_NOTES_1.6.5.md)
+4. Notes: [`releases/RELEASE_NOTES_1.6.5.5.md`](releases/RELEASE_NOTES_1.6.5.5.md)
 
 ### Build yourself
 
@@ -61,21 +61,28 @@ pio run -t upload -e m5cardputer
 
 ---
 
-## What’s new in **1.6.5**
+## What’s new in **1.6.5.5**
+
+OINK sniff is back to **upstream [cm0-cardputer](https://github.com/0ct0sec/M5PORKCHOP/tree/cm0-cardputer)**.  
+A heap-park of NetworkRecon on HASHES/PWNCRACK hide had killed handshake catch. Rolled back.
 
 | Change | Why |
 |--------|-----|
-| **HASHES ↔ PWNCRACK no longer hard-reboots** | PWNCRACK used `vector::reserve` / `shrink_to_fit` on a fragmented heap. ESP32 has **no C++ exceptions** → `abort()` → reboot. HASHES already avoided this; PWNCRACK now matches. |
-| Cache clear without shrink | WPA-SEC / PWNCRACK caches `clear()` only |
-| Safer `NetworkRecon::freeNetworks()` | `shrink_to_fit` no longer runs inside a spinlock |
-| **PWNCRACK S/T brews heap first** | Same park+brew HASHES already used before WPA-SEC. Upload was dying at `LOW HEAP 4` because Recon still held ~19 KB. |
-| **Leave loot menus with Recon parked** | Hide no longer `start()`s Recon. Bounce HASHES ↔ PWNCRACK every minute keeps the hole. OINK / DNH / SPECTRUM start Recon themselves. |
-| **FRESH** (idle **Z** / SYSTEM) | Kill Recon + Wi-Fi + BLE, brew heap, radio asleep. Then **O** like after power-on. |
-| **OINK HUNT** (Settings → RADIO) | **KEEP** = classic (default). **RETRY** = each new O resets failed tries. Already-saved HS stay skipped. |
-| **OINK bottom bar** | Left: counts. Right: name of the AP being hit (or `[GHOST]`). |
-| Honest docs | This README is a **full capability map**, not just a 1.6 teaser |
+| **Handshake catch = original OINK** | Recon stays up after HASHES. After PWNCRACK upload, Recon `start()`s again. Same as 0ct0. |
+| **FRESH** still there | Idle **Z** / SYSTEM → FRESH when *you* want heap, not automatic on loot exit |
+| **OINK HUNT** | Settings → RADIO: **KEEP** (default, original) or **RETRY** |
+| **OINK bar** | Right: SSID being hit (`[GHOST]` if hidden) |
+| HASHES ↔ PWNCRACK no reboot | Still from 1.6.5 (`reserve`/`shrink` crash) |
 
-**Handshake / PMKID capture is still OINK.** This release does not rewrite sniff. If OINK caught it before, it still does.
+---
+
+## What’s in **1.6.5** (still here)
+
+| Change | Why |
+|--------|-----|
+| **HASHES ↔ PWNCRACK no longer hard-reboots** | PWNCRACK `reserve` / `shrink_to_fit` on a fragmented heap → `abort()` |
+| Cache clear without shrink | WPA-SEC / PWNCRACK caches `clear()` only |
+| Safer `NetworkRecon::freeNetworks()` | `shrink_to_fit` no longer inside a spinlock |
 
 Older 1.6 work (pwncrack.org client, zombie skin) stays.  
 We did **not** ship the big WiFiService rewrite — it hurt heap/XFER/Blues on device.
@@ -277,7 +284,7 @@ A failed big `vector::reserve` / `shrink_to_fit` → **hard reboot**. We documen
 | **B08** | EVILPIG portal | Phone ignores portal (old) | ✅ fixed 1.4.1 |
 | **B09** | Experimental radio borrow | Broke STA | ✅ not shipped |
 | **B10** | ZOMBIE skin | Locked | ✅ intended — 3 night wolf bites |
-| **B11** | After WPA-SEC, XFER/heap | Heap 4 KB, PWN `LOW HEAP` | **Mitigated** — PWN S brews first; loot hide parks Recon; **Z** FRESH if you want a cold start. Number may still read 14–19 vs 30+. Upload + OINK capture are what count. |
+| **B11** | After WPA-SEC, XFER/heap | Heap 4 KB, PWN `LOW HEAP` | ⚠️ **Z** FRESH then **S**. Do **not** auto-park Recon on HASHES hide — that broke HS catch. |
 
 **Legend:** ⚠️ still a pig · ✅ fixed or intentional
 
@@ -288,7 +295,7 @@ A failed big `vector::reserve` / `shrink_to_fit` → **hard reboot**. We documen
 https://github.com/lexilexiko/OnePork/issues
 
 ```text
-Version: v0.1.8c (1.6.5)
+Version: v0.1.8c (1.6.5.5)
 Hardware: M5Cardputer (ADV? C5?)
 Steps:
   1. ...
@@ -312,7 +319,7 @@ Upstream-only bugs: https://github.com/0ct0sec/M5PORKCHOP/issues
 |------|----------|
 | **This README** | Fan front door, **full capability map**, bugs, how to report |
 | **[FAN.md](FAN.md)** | What appeared in the fan package |
-| **[releases/RELEASE_NOTES_1.6.5.md](releases/RELEASE_NOTES_1.6.5.md)** | 1.6.5 flash + this fix |
+| **[releases/RELEASE_NOTES_1.6.5.5.md](releases/RELEASE_NOTES_1.6.5.5.md)** | 1.6.5.5 OINK sniff restore |
 | **[releases/README.md](releases/README.md)** | Prebuilt binary pointer |
 
 ---

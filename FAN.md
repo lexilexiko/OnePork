@@ -4,9 +4,10 @@ This file is the **changelog of fan work** on top of upstream **M5PORKCHOP**.
 
 | | |
 |--|--|
-| **Current** | **v0.1.8c (1.6.5)** |
-| **Upstream base** | 0.1.8c |
+| **Current** | **v0.1.8c (1.6.5.5)** |
+| **Upstream base** | 0.1.8c / [cm0-cardputer](https://github.com/0ct0sec/M5PORKCHOP/tree/cm0-cardputer) |
 | **Main README** | [README.md](README.md) — install, **capability map**, bugs table, how to report |
+| **Release notes 1.6.5.5** | [releases/RELEASE_NOTES_1.6.5.5.md](releases/RELEASE_NOTES_1.6.5.5.md) |
 | **Release notes 1.6.5** | [releases/RELEASE_NOTES_1.6.5.md](releases/RELEASE_NOTES_1.6.5.md) |
 | **Release notes 1.6** | [releases/RELEASE_NOTES_1.6.md](releases/RELEASE_NOTES_1.6.md) |
 
@@ -33,6 +34,21 @@ Not a rewrite of the barn — **extra straw**:
 - Cloud: WPA-SEC (upstream-style) + **pwncrack.org** (1.6, separate)  
 - Skins: CLASSIC / BLUSH / HOG / **ZOMBIE** (unlock) / RETRO  
 - Packaging: One Pork branding, auto-OINK warm-up, prebuilt bins under `releases/`
+
+---
+
+## v1.6.5.5 — OINK sniff restored
+
+Park-on-hide of NetworkRecon (heap trick) **broke handshake catch**.  
+1.6.5.5 puts OINK/Recon back to **upstream cm0-cardputer**.
+
+| Item | Description |
+|------|-------------|
+| OINK start | Same as 0ct0: if Recon is down, `start()`; do not tear radio down first |
+| HASHES hide | Resume Recon if paused — do **not** stop + free |
+| PWNCRACK done | `disconnectWiFi()` starts Recon again |
+| FRESH | Still optional (Z / SYSTEM) when you want heap |
+| Bar / HUNT | SSID on the right; RADIO → OINK HUNT KEEP/RETRY |
 
 ---
 

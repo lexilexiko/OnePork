@@ -8,8 +8,6 @@
 #include "../core/wifi_utils.h"
 #include "../core/network_recon.h"
 #include "../core/tls.h"
-#include "../core/heap_policy.h"
-#include "../piglet/avatar.h"
 #include <M5Cardputer.h>
 #include <WiFi.h>
 #include <SD.h>
@@ -349,45 +347,9 @@ void PwncrackMenu::hide() {
     // fragmented heap (exceptions off → std::terminate → reboot).
     selectedInfoValid = false;
     Pwncrack::freeCacheMemory();
-    restoreAfterCloud();
     if (WiFi.status() == WL_CONNECTED) {
         disconnectWiFi();
     }
-    // Leave Recon parked. Starting it here is why HASHES→PWNCRACK showed 4KB:
-    // brew made a 24KB hole, then resume ate ~19KB. OINK/DNH/SPECTRUM start()
-    // Recon themselves. Bounce HASHES↔PWNCRACK keeps the hole.
-    if (NetworkRecon::isRunning() || NetworkRecon::isPaused()) {
-        NetworkRecon::stop();
-        NetworkRecon::freeNetworks();
-    }
-    size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-    if (largest < HeapPolicy::kMinContigForTls) {
-        Serial.printf("[PWNCRACK] hide brew (largest=%u)\n", (unsigned)largest);
-        WiFiUtils::conditionHeapForTLS();
-    }
-}
-
-void PwncrackMenu::prepareHeapForCloud() {
-    // Same recipe HASHES uses before WPA-SEC: the 24KB number is not extra RAM,
-    // it is one coalesced hole after parking the pig + Recon and brewing.
-    strncpy(syncStatusText, "BREWING HEAP...", sizeof(syncStatusText) - 1);
-    Avatar::suspendScene();
-    if (NetworkRecon::isRunning()) {
-        Serial.println("[PWNCRACK] Pausing NetworkRecon for cloud");
-        NetworkRecon::pause();
-        NetworkRecon::freeNetworks();
-    } else if (NetworkRecon::isPaused()) {
-        NetworkRecon::freeNetworks();
-    }
-    Pwncrack::freeCacheMemory();
-    size_t largestAfter = WiFiUtils::conditionHeapForTLS();
-    Serial.printf("[PWNCRACK] Post-brew heap: free=%u largest=%u\n",
-                  (unsigned)ESP.getFreeHeap(), (unsigned)largestAfter);
-}
-
-void PwncrackMenu::restoreAfterCloud() {
-    Avatar::resumeScene();
-    // Do not resume Recon — that is the 19KB that turns 24KB back into 4KB.
 }
 
 void PwncrackMenu::onSyncProgress(const char* status, uint8_t progress, uint8_t total) {
@@ -423,6 +385,7 @@ bool PwncrackMenu::connectToWiFi() {
     if (WiFi.status() != WL_CONNECTED) {
         strncpy(syncError, "WIFI CONNECT FAILED", sizeof(syncError) - 1);
         WiFiUtils::shutdown();
+        NetworkRecon::start();
         return false;
     }
     return true;
@@ -430,15 +393,15 @@ bool PwncrackMenu::connectToWiFi() {
 
 void PwncrackMenu::disconnectWiFi() {
     WiFiUtils::shutdown();
-    // Recon stays down until a radio mode asks for it (see hide()).
+    NetworkRecon::start();
 }
 
 void PwncrackMenu::startSync() {
     ensureKeyLoaded();
     detailViewActive = false;
     syncModalActive = true;
-    syncState = PwnSyncState::PREPARING;
-    strncpy(syncStatusText, "BREWING HEAP...", sizeof(syncStatusText) - 1);
+    syncState = PwnSyncState::CONNECTING_WIFI;
+    syncStatusText[0] = '\0';
     syncError[0] = '\0';
     syncUploaded = syncFailed = syncSkipped = 0;
     syncCracked = syncNewCracked = 0;
@@ -465,8 +428,10 @@ void PwncrackMenu::startDiag() {
     ensureKeyLoaded();
     detailViewActive = false;
     syncModalActive = true;
-    syncState = PwnSyncState::PREPARING;
-    strncpy(syncStatusText, "BREWING HEAP...", sizeof(syncStatusText) - 1);
+    syncState = PwnSyncState::CONNECTING_WIFI;
+    // Reuse CONNECTING then branch via a flag in status text
+    strncpy(syncStatusText, "DIAG:WIFI...", sizeof(syncStatusText) - 1);
+    syncError[0] = '\0';
     lastDiag = {};
     // Special: mark we want diag after wifi by setting a sentinel in syncError
     strncpy(syncError, "__DIAG__", sizeof(syncError) - 1);
@@ -476,11 +441,6 @@ void PwncrackMenu::startDiag() {
 void PwncrackMenu::processSyncState() {
     if (!syncModalActive) return;
     switch (syncState) {
-        case PwnSyncState::PREPARING:
-            prepareHeapForCloud();
-            strncpy(syncStatusText, "CONNECTING WIFI...", sizeof(syncStatusText) - 1);
-            syncState = PwnSyncState::CONNECTING_WIFI;
-            break;
         case PwnSyncState::CONNECTING_WIFI:
             strncpy(syncStatusText, "CONNECTING WIFI...", sizeof(syncStatusText) - 1);
             if (connectToWiFi()) {
@@ -492,7 +452,6 @@ void PwncrackMenu::processSyncState() {
                 }
             } else {
                 syncState = PwnSyncState::ERROR;
-                restoreAfterCloud();
             }
             break;
         case PwnSyncState::RUNNING_DIAG: {
@@ -504,7 +463,6 @@ void PwncrackMenu::processSyncState() {
             }
             syncState = PwnSyncState::DIAG_DONE;
             disconnectWiFi();
-            restoreAfterCloud();
             break;
         }
         case PwnSyncState::UPLOADING: {
@@ -534,7 +492,6 @@ void PwncrackMenu::processSyncState() {
                 }
             }
             disconnectWiFi();
-            restoreAfterCloud();
             scanFiles();  // refresh ST flags
             break;
         }
@@ -727,11 +684,7 @@ void PwncrackMenu::drawSyncModal(M5Canvas& canvas) {
         }
         canvas.drawString("ENTER/ESC", canvas.width() / 2, boxY + boxH - 14);
     } else {
-        canvas.drawString(syncStatusText[0] ? syncStatusText : "...", canvas.width() / 2, boxY + 36);
-        char heapText[32];
-        snprintf(heapText, sizeof(heapText), "HEAP: %uKB",
-                 (unsigned)(heap_caps_get_largest_free_block(MALLOC_CAP_8BIT) / 1024));
-        canvas.drawString(heapText, canvas.width() / 2, boxY + 56);
+        canvas.drawString(syncStatusText[0] ? syncStatusText : "...", canvas.width() / 2, boxY + 48);
     }
     canvas.setTextDatum(TL_DATUM);
 }
