@@ -132,7 +132,8 @@ static uint16_t hdrLen80211(const uint8_t* f, uint16_t len) {
 }
 
 static void parseBeacon(const uint8_t* f, uint16_t len) {
-    if ((f[0] & 0xFC) != 0x80) return;
+    uint8_t fc = f[0] & 0xFC;
+    if (fc != 0x80 && fc != 0x50) return;
     const uint8_t* bssid = f + 16;
     uint16_t off = 24 + 12;
     if (off + 2 > len) return;
@@ -242,6 +243,15 @@ void reset() {
 
 bool shouldPauseDeauth() {
     return s_lastM1Ms != 0 && (millis() - s_lastM1Ms) < 1200;
+}
+
+bool hasPair(const uint8_t* bssid) {
+    if (!bssid) return false;
+    for (uint8_t i = 0; i < MAX_HS; i++) {
+        if (s_hs[i].used && memcmp(s_hs[i].bssid, bssid, 6) == 0)
+            return s_hs[i].wroteEapol || s_hs[i].wrotePmkid;
+    }
+    return false;
 }
 
 void feed(const uint8_t* frame, uint16_t len) {

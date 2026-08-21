@@ -10,6 +10,7 @@
 #include "sync/sync_manager.h"
 #include "button/button.h"
 #include "board/board.h"
+#include "sync/net_io.h"
 
 void setup() {
     Serial.begin(115200);
@@ -41,6 +42,7 @@ void setup() {
 
     // 5. Web server
     Web::begin();
+    ioPumpFn() = []() { Web::loop(); };
 }
 
 static unsigned long s_lastHeapLog = 0;

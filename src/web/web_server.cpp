@@ -66,6 +66,8 @@ static const char* INDEX_HTML =
 "  a{color:var(--pink)}\n"
 "  .empty{color:var(--dim);font-style:italic;padding:8px 0}\n"
 "  footer{max-width:760px;margin:0 auto 18px;padding:0 14px;color:var(--dim);font-size:11px;letter-spacing:.08em;text-transform:uppercase}\n"
+"  .bar{height:8px;background:#100a0c;border-radius:6px;overflow:hidden;margin-top:10px}\n"
+"  .bar>div{height:100%;width:0;background:var(--rose);transition:width .2s}\n"
 "</style>\n"
 "</head>\n"
 "<body>\n"
@@ -130,14 +132,15 @@ static const char* INDEX_HTML =
 "    <h2>Capture</h2>\n"
 "    <div class=\"row\"><span class=\"k\">State</span><span class=\"v\" id=\"cap-state\">--</span></div>\n"
 "    <div class=\"row\"><span class=\"k\">Channel</span><span class=\"v\" id=\"cap-ch\">--</span></div>\n"
-"    <div class=\"row\"><span class=\"k\">EAPOL / written</span><span class=\"v\" id=\"cap-cnt\">--</span></div>\n"
+"    <div class=\"row\"><span class=\"k\">EAPOL / written / kick</span><span class=\"v\" id=\"cap-cnt\">--</span></div>\n"
+"    <div class=\"row\"><span class=\"k\">Last handshake</span><span class=\"v\" id=\"cap-hs\">--</span></div>\n"
 "    <div class=\"row\"><span class=\"k\">Files in /handshakes/</span><span class=\"v\" id=\"cap-files\">--</span></div>\n"
 "    <button id=\"cap-btn\" onclick=\"toggleCapture()\">--</button>\n"
 "    <label>Aggressive button GPIO</label>\n"
 "    <input id=\"btn-gpio\" type=\"number\" min=\"0\" max=\"48\" placeholder=\"0\" autocomplete=\"off\">\n"
 "    <button class=\"alt\" onclick=\"saveBtn()\">Save button GPIO</button>\n"
 "    <p class=\"hint\" id=\"btn-hint\">Stamp C3 = 3. Most ESP32 / S3 BOOT = 0. C3 DevKit BOOT = 9.</p>\n"
-"    <p class=\"hint\">Web START is light: this channel only, UI stays. The GPIO you set is aggressive: hops 1-13, kicks nearby clients, SSID becomes 0n3Pork AGG. Press again to stop, then reconnect to 0n3Pork W3b.</p>\n"
+"    <p class=\"hint\">Web START is light: this channel, UI stays, PMKID probe. Button is aggressive: hop, kick both ways, lock 8s on EAPOL so M2 is not missed. Download .pcap / .22000 here and upload from a PC if you want.</p>\n"
 "    <h3 style=\"margin-top:12px;margin-bottom:8px;font-size:12px;color:var(--dim);text-transform:uppercase;letter-spacing:.06em\">Handshake files</h3>\n"
 "    <table style=\"width:100%;font-size:12px;border-collapse:collapse\">\n"
 "    <thead><tr style=\"border-bottom:1px solid var(--b)\"><th style=\"text-align:left;padding:6px 0\">File</th><th style=\"text-align:right;padding:6px 0\">Size</th><th style=\"text-align:right;padding:6px 0\">Action</th></tr></thead>\n"
@@ -156,7 +159,8 @@ static const char* INDEX_HTML =
 "      <button onclick=\"sync('wpasec')\">Sync WPA-Sec</button>\n"
 "    </div>\n"
 "    <button onclick=\"sync('pwncrack')\">Sync Pwncrack</button>\n"
-"    <p class=\"hint\">Sync joins the saved WiFi as AP+STA so 0n3Pork W3b stays up.</p>\n"
+"    <p class=\"hint\">Sync streams .pcap to WPA-Sec and .22000 to Pwncrack (large files ok). AP stays up.</p>\n"
+"    <div class=\"bar\"><div id=\"sync-bar\"></div></div>\n"
 "    <pre id=\"sync-log\">no sync yet</pre>\n"
 "  </section>\n"
 "  <section class=\"card\">\n"
@@ -220,14 +224,15 @@ static const char* INDEX_HTML =
 "    if($('m-board')) $('m-board').textContent=(s.board||'--')+' / GPIO'+(s.btnGpio!==undefined?s.btnGpio:'?');\n"
 "    if($('btn-gpio') && !$('btn-gpio').dataset.touched && s.btnGpio!==undefined) $('btn-gpio').value=s.btnGpio;\n"
 "    var cm=s.capMode||'off';\n"
-"    if(cm==='aggressive') $('cap-state').innerHTML='<span class=\"err\">aggressive</span>';\n"
-"    else if(cm==='light') $('cap-state').innerHTML='<span class=\"ok\">light</span>';\n"
+"    if(cm==='aggressive') $('cap-state').innerHTML=s.capLocked?'<span class=\"ok\">aggressive lock</span>':'<span class=\"err\">aggressive</span>';\n"
+"    else if(cm==='light') $('cap-state').innerHTML=s.capLocked?'<span class=\"ok\">light lock</span>':'<span class=\"ok\">light</span>';\n"
 "    else $('cap-state').innerHTML='<span class=\"warn\">stopped</span>';\n"
 "    $('cap-btn').textContent = (cm==='light'||cm==='aggressive')?'STOP light':'START light';\n"
 "    $('cap-btn').disabled = (cm==='aggressive');\n"
 "    capRunning = (cm==='light');\n"
 "    $('cap-ch').textContent = s.capChannel||'--';\n"
-"    $('cap-cnt').textContent = (s.capEapol||0)+' / '+(s.capWritten||0);\n"
+"    $('cap-cnt').textContent = (s.capEapol||0)+' / '+(s.capWritten||0)+' / '+(s.capDeauth||0);\n"
+"    if($('cap-hs')) $('cap-hs').textContent=(s.lastHsSsid||s.currentBssid||'--');\n"
 "    $('cap-files').textContent=s.handshakeCount;\n"
 "    fillSaved('ap-ssid', s.apName);\n"
 "    fillSaved('ap-pass', s.apPass);\n"
@@ -239,9 +244,15 @@ static const char* INDEX_HTML =
 "    }\n"
 "    const f=await jget('/api/fs');\n"
 "    $('fs-stats').textContent = Math.round(f.total/1024)+'K total, '+Math.round(f.free/1024)+'K free';\n"
-"    if(s.sync && s.sync.message){\n"
-"      var extra = s.sync.running ? ' ('+s.sync.progress+'%)' : '';\n"
-"      $('sync-log').textContent = s.sync.message + extra;\n"
+"    if(s.sync){\n"
+"      var bar=$('sync-bar');\n"
+"      if(bar) bar.style.width=(s.sync.progress||0)+'%';\n"
+"      if(s.sync.message){\n"
+"        var extra = s.sync.running ? ' ('+(s.sync.progress||0)+'%)' : '';\n"
+"        var kb='';\n"
+"        if(s.sync.size) kb='  '+Math.round(s.sync.sent/1024)+'K/'+Math.round(s.sync.size/1024)+'K';\n"
+"        $('sync-log').textContent = s.sync.message + extra + kb;\n"
+"      }\n"
 "    }\n"
 "  }catch(e){console.log(e);}\n"
 "}\n"
@@ -467,6 +478,9 @@ static void handleStatus() {
     doc["capEapol"] = c.framesEapol;
     doc["capWritten"] = c.framesWritten;
     doc["capDeauth"] = c.framesDeauth;
+    doc["capLocked"] = Cap::isLocked();
+    doc["currentBssid"] = c.currentBssid;
+    doc["lastHsSsid"] = c.lastHsSsid;
     Storage::Stats fs = Storage::stats();
     doc["handshakeCount"] = fs.handshakes;
 
@@ -475,6 +489,10 @@ static void handleStatus() {
     syncObj["running"] = SyncManager::isRunning();
     syncObj["message"] = syncState.message;
     syncObj["progress"] = syncState.progress;
+    syncObj["file"] = syncState.file;
+    syncObj["files"] = syncState.files;
+    syncObj["sent"] = syncState.sent;
+    syncObj["size"] = syncState.size;
 
     const Net::Cfg& cfg = Net::cfg();
     doc["apName"] = cfg.apSsid;

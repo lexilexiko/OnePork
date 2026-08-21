@@ -2,6 +2,7 @@
 #include "sync_manager.h"
 #include "wpasec.h"
 #include "pwncrack.h"
+#include "net_io.h"
 #include "../net/ap_sta.h"
 #include "../cap/sniffer.h"
 #include <string.h>
@@ -102,19 +103,50 @@ SyncState getStatus() {
     out.progress = s_state.progress;
     strncpy(out.message, s_state.message, sizeof(out.message) - 1);
     out.message[sizeof(out.message) - 1] = '\0';
+    IoXfer& x = ioXfer();
+    out.file = x.file;
+    out.files = x.files;
+    out.sent = x.sent;
+    out.size = x.size;
+    if (x.files && x.file) {
+        int pct = (int)((x.file - 1) * 100 / x.files);
+        if (x.size) pct += (int)((uint64_t)x.sent * 100 / x.size / x.files);
+        if (pct > 99) pct = 99;
+        if (s_state.status == SYNC_UPLOADING) out.progress = pct;
+    }
     return out;
+}
+
+static void onProg(const char* status, uint8_t progress, uint8_t total) {
+    IoXfer& x = ioXfer();
+    char msg[128];
+    if (x.size) {
+        snprintf(msg, sizeof(msg), "%s %u/%u  %uK/%uK",
+                 status ? status : "up",
+                 (unsigned)x.file, (unsigned)x.files,
+                 (unsigned)(x.sent / 1024), (unsigned)(x.size / 1024));
+    } else if (total) {
+        snprintf(msg, sizeof(msg), "%s %u/%u", status ? status : "up",
+                 (unsigned)progress, (unsigned)total);
+    } else {
+        snprintf(msg, sizeof(msg), "%s", status ? status : "up");
+    }
+    setMessage(msg);
+    (void)progress;
+    (void)total;
 }
 
 static void runUpload() {
     bool ok = false;
     char msg[128];
     msg[0] = '\0';
+    ioXferClear();
 
     if (s_state.target == SYNC_WPASEC) {
         if (!WPASec::canSync()) {
             snprintf(msg, sizeof(msg), "Not enough heap for TLS");
         } else {
-            WPASecSyncResult r = WPASec::syncCaptures(s_state.apiKey);
+            WPASecSyncResult r = WPASec::syncCaptures(s_state.apiKey, onProg);
             ok = r.success;
             if (ok) {
                 snprintf(msg, sizeof(msg), "WPA-Sec: up %u skip %u fail %u cracked %u",
@@ -130,7 +162,7 @@ static void runUpload() {
         if (!Pwncrack::canSync()) {
             snprintf(msg, sizeof(msg), "Not enough heap");
         } else {
-            PwncrackSyncResult r = Pwncrack::syncCaptures(s_state.apiKey);
+            PwncrackSyncResult r = Pwncrack::syncCaptures(s_state.apiKey, onProg);
             ok = r.success;
             if (ok) {
                 snprintf(msg, sizeof(msg), "Pwncrack: up %u skip %u fail %u cracked %u",
@@ -187,7 +219,7 @@ void loop() {
 
         case PHASE_WAITING_FOR_CONNECTION:
             if (Net::staLinked()) {
-                enterPhase(PHASE_UPLOADING, SYNC_UPLOADING, "Uploading...", 40, 180000);
+                enterPhase(PHASE_UPLOADING, SYNC_UPLOADING, "Uploading...", 40, 600000);
             } else if (now > s_state.timeout) {
                 setMessage("WiFi connect timeout");
                 enterPhase(PHASE_DONE, SYNC_DONE_FAILURE, nullptr, 0, 0);

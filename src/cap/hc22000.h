@@ -9,6 +9,7 @@ namespace Hc22000 {
 void reset();
 void feed(const uint8_t* frame, uint16_t len);
 bool shouldPauseDeauth();
+bool hasPair(const uint8_t* bssid);
 uint16_t convertPcap(const char* pcapPath);
 uint16_t convertAllPcaps();
 

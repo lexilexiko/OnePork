@@ -3,8 +3,10 @@
 #include "../storage/littlefs_ops.h"
 #include "../cap/hc22000.h"
 #include "../net/ap_sta.h"
+#include "net_io.h"
 #include <WiFi.h>
 #include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 #include <LittleFS.h>
 #include <ctype.h>
 #include <string.h>
@@ -14,7 +16,7 @@ static const char* PWN_HOST = "pwncrack.org";
 static const char* PWN_UPLOAD_PATH = "/upload_handshake";
 static const char* PWN_POTFILE_PATH = "/download_potfile_script";
 static const size_t PWN_MAX_CACHE = 100;
-static const uint8_t PWN_MAX_PENDING = 16;
+static const uint8_t PWN_MAX_PENDING = 32;
 
 bool Pwncrack::cacheLoaded = false;
 char Pwncrack::lastError[64] = "";
@@ -26,18 +28,11 @@ bool Pwncrack::isBusy() { return busy; }
 const char* Pwncrack::getLastError() { return lastError; }
 
 static bool writeAll(WiFiClient& c, const uint8_t* p, size_t n) {
-    size_t off = 0;
-    while (off < n) {
-        size_t w = c.write(p + off, n - off);
-        if (w == 0) return false;
-        off += w;
-        yield();
-    }
-    return true;
+    return ioWriteAll(c, p, n);
 }
 
 static bool writeStr(WiFiClient& c, const char* s) {
-    return writeAll(c, reinterpret_cast<const uint8_t*>(s), strlen(s));
+    return ioWriteAll(c, s);
 }
 
 bool Pwncrack::hasApiKey(const char* key) {
@@ -68,9 +63,7 @@ bool Pwncrack::canSync() {
 
 void Pwncrack::freeCacheMemory() {
     crackedCache.clear();
-    crackedCache.shrink_to_fit();
     uploadedCache.clear();
-    uploadedCache.shrink_to_fit();
     cacheLoaded = false;
 }
 
@@ -216,14 +209,34 @@ bool Pwncrack::uploadFile(const char* filepath, const char* apiKey) {
         return false;
     }
     size_t fileSize = capFile.size();
-    if (fileSize == 0 || fileSize > 200000) {
+    if (fileSize == 0) {
         capFile.close();
-        snprintf(lastError, sizeof(lastError), "bad size");
+        snprintf(lastError, sizeof(lastError), "empty");
+        return false;
+    }
+    if (fileSize > kHsUploadMax) {
+        capFile.close();
+        snprintf(lastError, sizeof(lastError), "too big");
         return false;
     }
 
     const char* filename = Storage::baseName(filepath);
-    Serial.printf("[PWNCRACK] upload %s (%u B)\n", filename, (unsigned)fileSize);
+    char uploadName[64];
+    size_t fn = strlen(filename);
+    if (fn > 8 && strcasecmp(filename + fn - 8, ".hc22000") == 0) {
+        strncpy(uploadName, filename, sizeof(uploadName) - 1);
+        uploadName[sizeof(uploadName) - 1] = '\0';
+    } else if (fn > 6 && strcasecmp(filename + fn - 6, ".22000") == 0) {
+        size_t stem = fn - 6;
+        if (stem + 8 >= sizeof(uploadName)) stem = sizeof(uploadName) - 9;
+        memcpy(uploadName, filename, stem);
+        memcpy(uploadName + stem, ".hc22000", 8);
+        uploadName[stem + 8] = '\0';
+    } else {
+        snprintf(uploadName, sizeof(uploadName), "%s.hc22000", filename);
+    }
+    Serial.printf("[PWNCRACK] upload %s as %s (%u B)\n",
+                  filename, uploadName, (unsigned)fileSize);
 
     char boundary[32];
     snprintf(boundary, sizeof(boundary), "----Pwn%08lX", (unsigned long)millis());
@@ -235,22 +248,27 @@ bool Pwncrack::uploadFile(const char* filepath, const char* apiKey) {
     snprintf(fileHead, sizeof(fileHead),
              "--%s\r\nContent-Disposition: form-data; name=\"handshake\"; filename=\"%s\"\r\n"
              "Content-Type: application/octet-stream\r\n\r\n",
-             boundary, filename);
+             boundary, uploadName);
     char fileTail[48];
     snprintf(fileTail, sizeof(fileTail), "\r\n--%s--\r\n", boundary);
     size_t contentLength = strlen(keyPart) + strlen(fileHead) + fileSize + strlen(fileTail);
 
-    WiFiClient client;
-    client.setTimeout(15000);
-    if (!client.connect(PWN_HOST, 80, 8000)) {
+    WiFiClientSecure tls;
+    WiFiClient plain;
+    bool useTls = false;
+    static bool s_forceHttps = false;
+    if (!ioPwnOpen(tls, plain, useTls, PWN_HOST, s_forceHttps)) {
         capFile.close();
         snprintf(lastError, sizeof(lastError), "connect fail");
         return false;
     }
+    WiFiClient& client = useTls ? static_cast<WiFiClient&>(tls) : plain;
+    client.setTimeout(60000);
 
-    char hdr[280];
+    char hdr[360];
     snprintf(hdr, sizeof(hdr),
              "POST %s HTTP/1.1\r\nHost: %s\r\n"
+             "User-Agent: 0n3Pork/" ON3PORK_VERSION "\r\n"
              "Content-Type: multipart/form-data; boundary=%s\r\n"
              "Content-Length: %u\r\nConnection: close\r\n\r\n",
              PWN_UPLOAD_PATH, PWN_HOST, boundary, (unsigned)contentLength);
@@ -261,47 +279,28 @@ bool Pwncrack::uploadFile(const char* filepath, const char* apiKey) {
         return false;
     }
 
-    uint8_t buf[512];
-    size_t left = fileSize;
-    while (left > 0) {
-        size_t chunk = left > sizeof(buf) ? sizeof(buf) : left;
-        size_t rd = capFile.read(buf, chunk);
-        if (rd == 0) break;
-        if (!writeAll(client, buf, rd)) {
-            capFile.close();
-            client.stop();
-            snprintf(lastError, sizeof(lastError), "send body");
-            return false;
-        }
-        left -= rd;
-        yield();
-    }
-    capFile.close();
+    if (!ioStreamFile(client, capFile, fileSize, lastError, sizeof(lastError)))
+        return false;
     if (!writeStr(client, fileTail)) {
         client.stop();
         snprintf(lastError, sizeof(lastError), "send tail");
         return false;
     }
 
-    unsigned long t0 = millis();
     char status[80] = {0};
-    size_t si = 0;
-    while (millis() - t0 < 20000) {
-        if (!client.available()) {
-            if (!client.connected() && si > 0) break;
-            delay(10);
-            yield();
-            continue;
-        }
-        char ch = (char)client.read();
-        if (ch == '\n') break;
-        if (ch != '\r' && si + 1 < sizeof(status)) status[si++] = ch;
+    bool got = ioReadStatusLine(client, status, sizeof(status), 45000);
+    if (got && ioHttpRedirect(status)) {
+        ioDrain(client, 4000);
+        client.stop();
+        s_forceHttps = true;
+        snprintf(lastError, sizeof(lastError), "https redirect");
+        return false;
     }
-    status[si] = '\0';
+    ioDrain(client, 15000);
     client.stop();
-    Serial.printf("[PWNCRACK] %s\n", status);
+    Serial.printf("[PWNCRACK] %s tls=%u\n", status, (unsigned)useTls);
 
-    bool ok = strstr(status, "200") || strstr(status, "201") || strstr(status, "409");
+    bool ok = got && ioHttpOk(status);
     if (!ok) {
         if (strstr(status, "401") || strstr(status, "403")) {
             snprintf(lastError, sizeof(lastError), "bad key");
@@ -403,8 +402,8 @@ bool Pwncrack::downloadPotfile(const char* apiKey, uint16_t& newCracks) {
 
 struct PwnScanCtx {
     struct Item {
-        char path[48];
-        char id[32];
+        char path[64];
+        char id[48];
     };
     Item items[PWN_MAX_PENDING];
     uint8_t count;
@@ -421,7 +420,7 @@ static bool isHashName(const char* name) {
 static void pwnCollect(const char* name, size_t size, void* raw) {
     PwnScanCtx* ctx = (PwnScanCtx*)raw;
     if (ctx->count >= PWN_MAX_PENDING) return;
-    if (size == 0 || !isHashName(name)) return;
+    if (size == 0 || size > kHsUploadMax || !isHashName(name)) return;
     if (Pwncrack::isUploaded(name)) {
         ctx->skipped++;
         return;
@@ -468,13 +467,21 @@ PwncrackSyncResult Pwncrack::syncCaptures(const char* apiKey, PwncrackProgressCa
     result.skipped = scan.skipped;
 
     if (cb) cb("Uploading", 0, scan.count);
+    ioXferClear();
+    ioXferPhase("UPLOAD", 0, scan.count);
     for (uint8_t i = 0; i < scan.count; i++) {
         if (cb) cb("Uploading", i + 1, scan.count);
-        if (uploadFile(scan.items[i].path, apiKey)) {
+        ioXferPhase("UPLOAD", (uint16_t)(i + 1), scan.count);
+        bool up = uploadFile(scan.items[i].path, apiKey);
+        if (!up && strstr(lastError, "https"))
+            up = uploadFile(scan.items[i].path, apiKey);
+        if (up) {
             markAsUploaded(scan.items[i].id);
             result.uploaded++;
+            ioXfer().ok++;
         } else {
             result.failed++;
+            ioXfer().fail++;
         }
         delay(50);
         yield();
@@ -482,6 +489,7 @@ PwncrackSyncResult Pwncrack::syncCaptures(const char* apiKey, PwncrackProgressCa
     if (result.uploaded > 0) saveUploadedList();
 
     if (cb) cb("Potfile", scan.count, scan.count);
+    ioXferPhase("POTFILE", scan.count, scan.count);
     uint16_t newCracks = 0;
     bool potOk = downloadPotfile(apiKey, newCracks);
     if (potOk) {

@@ -197,6 +197,17 @@ User runs these and pastes output (text, not screenshot) for me to debug.
 
 ## 9. Build/compile error log
 
+- 2026-08-21 - Upload v0.5.1: stream LittleFS to WPA-Sec (TLS) and
+  Pwncrack (HTTP then HTTPS). No 100K/200K cap (up to 8 MB / FS).
+  Retry on TCP 0, drain reply, live bar in web (file i/n + KB).
+  Web::loop pumped while streaming so the UI updates.
+
+- 2026-08-19 - Capture quality v0.5.0 from 0N3P0rK method, no cloud
+  change: lock 8s on EAPOL (stop hopping before M2), probe-resp ESSID,
+  WDS/0x888E scan, client list + bidirectional deauth burst, PMKID
+  auth/assoc probe, promiscuous MGMT+DATA filter, WiFi sleep off.
+  Upload can stay PC-side.
+
 - 2026-08-14 - v0.4.2 ships a prebuilt .bin for every PIO env:
   stampc3, esp32c3, esp32s3, esp32s3uart, esp32s3-8m, esp32, esp32s2.
 

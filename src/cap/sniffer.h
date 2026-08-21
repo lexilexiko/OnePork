@@ -1,6 +1,6 @@
 // cap/sniffer.h
-// Light: stay on current channel, web UI stays up, no deauth.
-// Aggressive (board button only): hop 1-13, kick clients, catch handshakes.
+// Light: this channel, UI stays, PMKID probe, no deauth/hop.
+// Aggressive (board button): hop, kick, lock on EAPOL so M2 is not missed.
 
 #pragma once
 
@@ -21,6 +21,7 @@ void startAggressive();
 void stop();
 bool isRunning();
 RunMode runMode();
+bool isLocked();
 
 void loop();
 
@@ -34,6 +35,7 @@ struct Counters {
     uint32_t filesOpened;
     uint8_t  currentChannel;
     char     currentBssid[18];
+    char     lastHsSsid[33];
 };
 const Counters& counters();
 

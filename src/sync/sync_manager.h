@@ -28,8 +28,12 @@ enum SyncStatus {
 
 struct SyncState {
     SyncStatus status;
-    char message[128];    // human-readable status message
-    int progress;         // 0-100 for progress bar (optional)
+    char message[128];
+    int progress;
+    uint16_t file;
+    uint16_t files;
+    uint32_t sent;
+    uint32_t size;
 };
 
 // Start a sync task. Target = SYNC_WPASEC or SYNC_PWNCRACK.

@@ -13,7 +13,7 @@ One tree of source. **One binary per chip** — a C3 `.bin` will not boot on an 
 
 | | |
 |---|---|
-| **Version** | **v0.4.2** |
+| **Version** | **v0.5.1** |
 | **Chips** | ESP32 · S2 · S3 · C3 (M5Stamp C3 included) |
 | **UI** | `http://192.168.4.1` · `http://on3pork.local` |
 | **Storage** | LittleFS (no SD card) |
@@ -39,13 +39,13 @@ Deauth / handshake capture can be illegal. You are responsible for how you use t
 ## What it does
 
 1. **Capture** 802.11 EAPOL / PMKID
-   - **Light** (web **START light**): same channel, UI stays up
-   - **Aggressive** (the GPIO you set in the web UI): hop 1–13, deauth seen BSSIDs, SSID becomes `0n3Pork AGG`
+   - **Light** (web **START light**): same channel, UI stays, PMKID assoc probe
+   - **Aggressive** (GPIO in the web UI): hop 1–13, bidirectional kick, **lock 8s on EAPOL** so M2 is not missed
 2. Writes **`.pcap`** (WPA-Sec) and hashcat **`.22000` / `_hs.22000`** (`-m 22000`)
 3. **AP + STA**: stay on `0n3Pork W3b` while the board joins home Wi-Fi or a cracked network
 4. **Sync**
-   - [WPA-Sec](https://wpa-sec.stanev.org/) — upload pcap, download potfile
-   - [pwncrack.org](https://pwncrack.org/) — upload `.22000`, download potfile
+   - [WPA-Sec](https://wpa-sec.stanev.org/) — stream `.pcap` (large files ok), download potfile
+   - [pwncrack.org](https://pwncrack.org/) — stream `.22000` (HTTP, TLS if needed), download potfile
 5. Web list of cracked keys, **Join** to connect, download captures
 
 Arduino-ESP32 2.0 usually has **no NAT**. AP+STA keeps the UI and gives the board internet. The phone does not get NATed internet through the device.
@@ -98,15 +98,15 @@ S3 default image is **4 MB + DIO**. That matches SuperMini / N4 modules. If you 
 
 ### Prebuilt
 
-Release: https://github.com/lexilexiko/0n3Pork-W3b/releases/tag/w3b-v0.4.2
+Release: https://github.com/lexilexiko/0n3Pork-W3b/releases/tag/w3b-v0.5.1
 
-- [M5Stamp C3](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-stampc3.bin)
-- [ESP32-C3 DevKit](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-esp32c3.bin)
-- [ESP32-S3 USB 4 MB](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-esp32s3.bin)
-- [ESP32-S3 UART 4 MB](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-esp32s3uart.bin)
-- [ESP32-S3 N8 8 MB](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-esp32s3-8m.bin)
-- [ESP32 classic](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-esp32.bin)
-- [ESP32-S2](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.4.2/0n3Pork-W3b-v0.4.2-esp32s2.bin)
+- [M5Stamp C3](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.5.1/0n3Pork-W3b-v0.5.1-stampc3.bin)
+- [ESP32-C3 DevKit](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.5.1/0n3Pork-W3b-v0.5.1-esp32c3.bin)
+- [ESP32-S3 USB 4 MB](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.5.1/0n3Pork-W3b-v0.5.1-esp32s3.bin)
+- [ESP32-S3 UART 4 MB](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.5.1/0n3Pork-W3b-v0.5.1-esp32s3uart.bin)
+- [ESP32-S3 N8 8 MB](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.5.1/0n3Pork-W3b-v0.5.1-esp32s3-8m.bin)
+- [ESP32 classic](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.5.1/0n3Pork-W3b-v0.5.1-esp32.bin)
+- [ESP32-S2](https://github.com/lexilexiko/0n3Pork-W3b/releases/download/w3b-v0.5.1/0n3Pork-W3b-v0.5.1-esp32s2.bin)
 
 S3 USB/UART files are **4 MB**. Use the N8 file only on a real 8 MB DevKit.
 
